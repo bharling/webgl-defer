@@ -59,7 +59,11 @@ gbuffer_frag = """
 """;
 
 class DFIR.Gbuffer
-  constructor: ->
+  
+  constructor: (@width=512, @height=512) ->
+    @width = gl.viewportWidth
+    @height = gl.viewportHeight
+    @createFrameBuffer()
     
     
   createFrameBuffer: ->
@@ -79,28 +83,40 @@ class DFIR.Gbuffer
     @depthTextureUnit = @createTexture()
     gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
     
+    # depth renderbuffer TODO: do we need this?
+    @renderBuffer = gl.createRenderbuffer()
+    gl.bindRenderbuffer gl.RENDERBUFFER, @renderBuffer
+    gl.renderbufferStorage gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, @width, @height
     
-    
+    gl.framebufferRenderbuffer gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, @renderbuffer 
+
   createTexture: ->
     tex = gl.createTexture()
     gl.bindTexture gl.TEXTURE_2D, tex
-    gl.bindTexture(gl.TEXTURE_2D, rttTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
-    gl.generateMipmap(gl.TEXTURE_2D)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.viewportWidth, gl.viewportHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    
+    #gl.generateMipmap(gl.TEXTURE_2D)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @width, @height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     tex
 
   bind: ->
-    
+    gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+    gl.bindRenderbuffer gl.RENDERBUFFER, @renderBuffer
 
   release : ->
-    
+    gl.bindFramebuffer gl.FRAMEBUFFER, null
+    gl.bindTexture gl.TEXTURE_2D, null
+    gl.bindRenderbuffer gl.RENDERBUFFER, null
     
   getDepthTextureUnit: ->
+    @depthTextureUnit
     
   getAlbedoTextureUnit: ->
+    @albedoTextureUnit
     
   getNormalsTextureUnit: ->
-    
+    @normalsTextureUnit
     

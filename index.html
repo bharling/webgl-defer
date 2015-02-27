@@ -333,10 +333,16 @@
 		teapot.material.showInfo();
 	}
 
-
+	
+	var gbuffer;
+	
     function webGLStart() {
         var canvas = document.getElementById("canvas");
         initGL(canvas);
+        
+        gbuffer = new DFIR.Gbuffer();
+        
+        
         initShaders();
         
         loadModel();

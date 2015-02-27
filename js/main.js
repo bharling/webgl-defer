@@ -1,5 +1,5 @@
 (function() {
-  var buildProgram, exports, getShader, getShaderParams, loadJSON, shader_type_enums,
+  var buildProgram, exports, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, shader_type_enums,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   exports = typeof exports !== 'undefined' ? exports : window;
@@ -248,6 +248,74 @@
     };
 
     return Shader;
+
+  })();
+
+  gbuffer_vert = "\nattribute vec3 aVertexNormal;\nattribute vec3 aVertexPosition;\nattribute vec2 aVertexTextureCoords;\n\nuniform mat4 uMVMatrix;\nuniform mat4 uPMatrix;\n\nvarying vec2 vTexCoords;\nvarying float depth;\nvarying vNormal;\n\nvoid main (void) {\n    vTexCoords = aVertexTextureCoords;\n    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    \n    depth = gl_Position.z;\n    vec4 n = uMVMatrix * vec4(aVertexNormal, 1.0);\n    vNormal = vec3(n.xyz);\n}";
+
+  gbuffer_frag = "#extension GL_EXT_draw_buffers : require\nprecision mediump float;\nvarying vec3 vNormal;\nvarying vec2 vTexCoords;\nvarying float depth;\n\nuniform float farClip;\nuniform float nearClip;\n\nvec4 pack (float depth) {\n  const vec4 bitSh = vec4(\n    256*256*256,\n    256*256,\n    256,\n    1.0\n  );\n  \n  const vec4 bitMask = vec4 (\n    0.0,\n    1.0 / 256.0,\n    1.0 / 256.0,\n    1.0 / 256.0\n  );\n  \n  vec4 comp = fract(depth * bitSh);\n  comp -= comp.xxyz * bitMask;\n  return comp;\n}\n\n\nvoid main (void) {\n  gl_FragData[0] = vec4(0.5,0.5,0.5,1.0);\n  gl_FragData[1] = vec4(vNormal, 1.0);\n  gl_FragData[2] = pack(1.0 - depth/farClip);\n}";
+
+  DFIR.Gbuffer = (function() {
+    function Gbuffer(width, height) {
+      this.width = width != null ? width : 512;
+      this.height = height != null ? height : 512;
+      this.width = gl.viewportWidth;
+      this.height = gl.viewportHeight;
+      this.createFrameBuffer();
+    }
+
+    Gbuffer.prototype.createFrameBuffer = function() {
+      this.ext = gl.getExtension('WEBGL_draw_buffers');
+      this.frameBuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      this.albedoTextureUnit = this.createTexture();
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
+      this.normalsTextureUnit = this.createTexture();
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
+      this.depthTextureUnit = this.createTexture();
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, this.depthTextureUnit, 0);
+      this.renderBuffer = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderBuffer);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, this.width, this.height);
+      return gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+    };
+
+    Gbuffer.prototype.createTexture = function() {
+      var tex;
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      return tex;
+    };
+
+    Gbuffer.prototype.bind = function() {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      return gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderBuffer);
+    };
+
+    Gbuffer.prototype.release = function() {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    };
+
+    Gbuffer.prototype.getDepthTextureUnit = function() {
+      return this.depthTextureUnit;
+    };
+
+    Gbuffer.prototype.getAlbedoTextureUnit = function() {
+      return this.albedoTextureUnit;
+    };
+
+    Gbuffer.prototype.getNormalsTextureUnit = function() {
+      return this.normalsTextureUnit;
+    };
+
+    return Gbuffer;
 
   })();
 
