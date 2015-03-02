@@ -71,6 +71,12 @@ class DFIR.Gbuffer
     @frameBuffer = gl.createFramebuffer()
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
     
+    @ext.drawBuffersWEBGL [
+        @ext.COLOR_ATTACHMENT0_WEBGL,
+        @ext.COLOR_ATTACHMENT1_WEBGL,
+        @ext.COLOR_ATTACHMENT2_WEBGL
+      ]
+    
     # albedo
     @albedoTextureUnit = @createTexture()
     gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, @albedoTextureUnit, 0

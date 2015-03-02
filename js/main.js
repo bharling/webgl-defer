@@ -1,5 +1,5 @@
 (function() {
-  var buildProgram, exports, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, shader_type_enums,
+  var buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, shader_type_enums,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   exports = typeof exports !== 'undefined' ? exports : window;
@@ -80,6 +80,10 @@
       return gl.uniformMatrix4fv(this.material.getUniform('uPMatrix'), false, pMatrix);
     };
 
+    JSONGeometry.prototype.setFloatUniform = function(name, val) {
+      return gl.uniform1f(this.material.getUniform(name), val);
+    };
+
     JSONGeometry.prototype.draw = function() {
       if (!this.material || !this.loaded) {
         return;
@@ -130,7 +134,7 @@
     gl.shaderSource(shader, str);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      alert(gl.getShaderInfoLog(shader));
+      console.log(id, gl.getShaderInfoLog(shader));
       return null;
     }
     return shader;
@@ -268,6 +272,7 @@
       this.ext = gl.getExtension('WEBGL_draw_buffers');
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      this.ext.drawBuffersWEBGL([this.ext.COLOR_ATTACHMENT0_WEBGL, this.ext.COLOR_ATTACHMENT1_WEBGL, this.ext.COLOR_ATTACHMENT2_WEBGL]);
       this.albedoTextureUnit = this.createTexture();
       gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
       this.normalsTextureUnit = this.createTexture();
@@ -316,6 +321,39 @@
     };
 
     return Gbuffer;
+
+  })();
+
+  fs_quad_vertex_shader = "attribute vec3 aVertexPosition;\nattribute vec2 aVertexTextureCoords;\n\nvarying vec2 vTexCoords;\n\nvoid main( void ) {\n  // passthru\n  gl_Position = vec4(aVertexPosition, 1.0);\n  \n  vTexCoords = aVertexTextureCoords;\n}\n";
+
+  fs_quad_fragment_shader = "varying vec2 vTexCoords;\n\nvoid main (void) {\n  gl_FragColor = vec4(vTexCoords, 1.0, 1.0);\n}\n";
+
+  DFIR.FullscreenQuad = (function() {
+    function FullscreenQuad() {
+      this.vertices = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+      this.textureCoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
+      this.vertexBuffer = new DFIR.Buffer(new Float32Array(this.vertices), 2, gl.STATIC_DRAW);
+      this.textureBuffer = new DFIR.Buffer(new Float32Array(this.textureCoords), 2, gl.STATIC_DRAW);
+    }
+
+    FullscreenQuad.prototype.setMaterial = function(shader) {
+      return this.material = shader;
+    };
+
+    FullscreenQuad.prototype.bind = function() {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer.get());
+      gl.enableVertexAttribArray(this.material.getAttribute('aVertexPosition'));
+      gl.vertexAttribPointer(this.material.getAttribute('aVertexPosition'), 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.textureBuffer.get());
+      gl.enableVertexAttribArray(this.material.getAttribute('aVertexTextureCoords'));
+      return gl.vertexAttribPointer(this.material.getAttribute('aVertexTextureCoords'), 2, gl.FLOAT, false, 0, 0);
+    };
+
+    FullscreenQuad.prototype.release = function() {
+      return gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    };
+
+    return FullscreenQuad;
 
   })();
 

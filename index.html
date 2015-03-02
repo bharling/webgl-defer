@@ -7,6 +7,96 @@
 <script type="text/javascript" src="js/glMatrix.min.js"></script>
 
 
+<script id="fs_quad_vert" type="x-shader/x-vertex">
+  attribute vec2 aVertexPosition;
+  attribute vec2 aVertexTextureCoords;
+  
+  varying vec2 vTexCoords;
+  
+  void main( void ) {
+    gl_Position = vec4(aVertexPosition,0.0, 1.0);
+    
+    vTexCoords = aVertexTextureCoords;
+  }
+</script>
+
+<script id="fs_quad_frag" type="x-shader/x-fragment">
+  precision mediump float;
+  
+  uniform sampler2D depthTexture;
+  uniform sampler2D normalsTexture;
+  
+  varying vec2 vTexCoords;
+  
+  void main (void) {
+    vec4 depthSample = texture2D(depthTexture, vTexCoords);
+    vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
+    gl_FragColor = mix(depthSample, normalsSample, 0.5);
+  }
+</script>
+
+
+<script id="gbuffer_vert" type="x-shader/x-vertex">
+  attribute vec3 aVertexNormal;
+  attribute vec3 aVertexPosition;
+  attribute vec2 aVertexTextureCoords;
+  
+  uniform mat4 uMVMatrix;
+  uniform mat4 uPMatrix;
+  
+  varying vec2 vTexCoords;
+  varying float depth;
+  varying vec3 vNormal;
+  
+  void main (void) {
+      vTexCoords = aVertexTextureCoords;
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    
+      depth = -gl_Position.z;
+      vec4 n = uMVMatrix * vec4(aVertexNormal, 1.0);
+      vNormal = vec3(n.xyz);
+  }
+</script>
+
+<script id="gbuffer_frag" type="x-shader/x-fragment">
+  #extension GL_EXT_draw_buffers : require
+  precision mediump float;
+  varying vec3 vNormal;
+  varying vec2 vTexCoords;
+  varying float depth;
+  
+  uniform float farClip;
+  uniform float nearClip;
+  
+  vec4 pack (float depth) {
+    const vec4 bitSh = vec4(
+      256*256*256,
+      256*256,
+      256,
+      1.0
+    );
+    
+    const vec4 bitMask = vec4 (
+      0.0,
+      1.0 / 256.0,
+      1.0 / 256.0,
+      1.0 / 256.0
+    );
+    
+    vec4 comp = fract(depth * bitSh);
+    comp -= comp.xxyz * bitMask;
+    return comp;
+  }
+  
+  
+  void main (void) {
+    gl_FragData[0] = vec4(0.5,0.5,0.5,1.0);
+    gl_FragData[1] = vec4(vNormal, 1.0);
+    gl_FragData[2] = pack(1.0 - depth/farClip);
+  }
+</script>
+
+
+
 <script id="teapot-fs" type="x-shader/x-fragment">
 	precision mediump float;
 	varying vec3 vNormal;
@@ -224,6 +314,8 @@
 		
     function drawScene() {
     	
+    	gbuffer.bind();
+    	
     	// set viewport dims
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         
@@ -247,14 +339,31 @@
         
         
         if (teapot.bind() ) {
+        	teapot.material.use();
         	teapot.setMatrixUniforms(mvMatrix, pMatrix);
+        	teapot.setFloatUniform('farClip', 100.0);
         
         	teapot.draw();
         }
         
+        gbuffer.release();
         
+        mvPopMatrix();
+        quad.material.use();
+        quad.bind();
         
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
         
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
+        
+        gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
+        gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
+        
+        gl.drawArrays(gl.TRIANGLES, 0, quad.vertexBuffer.numItems);
+        
+        quad.release();
         
         
         // tell gl we want to use the triangle vertex position buffer
@@ -276,7 +385,7 @@
         //gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
         
         // pop the matrix stack so we're back to just the position offset
-        mvPopMatrix();
+        
 
 		// move model view matrix to position for square
         //mat4.translate(mvMatrix, [3.0, 0.0, -2.0]);
@@ -325,12 +434,17 @@
 		animate();
 	}
 
-	var teapot;
+	var teapot, quad;
 
 	function loadModel () {
 		teapot = new DFIR.JSONGeometry('models/teapot.json');
-		teapot.setMaterial ( new DFIR.Shader( "teapot-vs", "teapot-fs" ) );
+		teapot.setMaterial ( new DFIR.Shader( "gbuffer_vert", "gbuffer_frag" ) );
 		teapot.material.showInfo();
+		
+		quad = new DFIR.FullscreenQuad();
+		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
+		quad.material.showInfo();
+		
 	}
 
 	
@@ -363,7 +477,7 @@
 <body onload="webGLStart();">
     <a href="http://learningwebgl.com/blog/?p=28">&lt;&lt; Back to Lesson 1</a><br />
 
-    <canvas id="canvas" style="border: none;" width="500" height="500"></canvas>
+    <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
 
     <br/>
     <a href="http://learningwebgl.com/blog/?p=28">&lt;&lt; Back to Lesson 1</a><br />

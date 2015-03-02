@@ -44,6 +44,9 @@ class DFIR.JSONGeometry
     gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, mvMatrix
     gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, pMatrix
     
+  setFloatUniform: (name, val) ->
+    gl.uniform1f @material.getUniform(name), val
+    
   draw : ->
     if !@material or !@loaded
       return
