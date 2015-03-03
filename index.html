@@ -378,6 +378,10 @@
 		// move model view matrix to position for triangle
         mat4.translate(mvMatrix, [0.0, 0.0, -30.0]);
         
+        // scale it down a tad
+        mat4.scale(mvMatrix, [0.7, 0.7, 0.7]);
+        
+        
        	// push the current model view matrix onto the stack ( so we can get back to it later ) 
         mvPushMatrix();
         
