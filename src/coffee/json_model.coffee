@@ -11,7 +11,7 @@ loadJSON = (url, callback) ->
 
 
 
-class DFIR.JSONGeometry
+class DFIR.JSONGeometry extends DFIR.Object3D
   constructor: (url) ->
     loadJSON url, @onDataLoaded
     @material = null

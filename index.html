@@ -44,7 +44,8 @@
   void main (void) {
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    gl_FragColor = mix(depthSample, normalsSample, vTexCoords.x);
+    gl_FragColor = normalsSample;
+    //gl_FragColor = mix(depthSample, normalsSample, vTexCoords.x);
   }
 </script>
 
@@ -65,14 +66,15 @@
       vTexCoords = aVertexTextureCoords;
       gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    
       depth = -gl_Position.z;
-      vec4 n = uMVMatrix * vec4(aVertexNormal, 1.0);
-      vNormal = vec3(n.xyz);
+      //vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
+      //vNormal = vec3(n.xyz);
+      vNormal = aVertexNormal;
   }
 </script>
 
 <script id="gbuffer_frag" type="x-shader/x-fragment">
   #extension GL_EXT_draw_buffers : require
-  precision mediump float;
+  precision highp float;
   varying vec3 vNormal;
   varying vec2 vTexCoords;
   varying float depth;
@@ -324,13 +326,29 @@
 	
 	var rTri = 0;
 	var rSquare = 0;
+	
+	
+	function defaultRenderSettings () {
+		gl.clearColor( 0.0, 0.0, 0.0, 0.0);
+		gl.enable(gl.DEPTH_TEST);
+		gl.depthFunc(gl.LEQUAL);
+		gl.depthMask(true);
+		gl.clearDepth(1.0);
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		gl.enable(gl.CULL_FACE);
+	}
+	
+	
 		
     function drawScene() {
     	
     	gbuffer.bind();
     	
+    	gl.cullFace ( gl.BACK) ;
+    	
     	// set viewport dims
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        // gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         
         // clear viewport
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -467,15 +485,14 @@
         var canvas = document.getElementById("canvas");
         initGL(canvas);
         
-        gbuffer = new DFIR.Gbuffer();
+        gbuffer = new DFIR.Gbuffer(1.0);
         
         
         initShaders();
         
         loadModel();
 
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.enable(gl.DEPTH_TEST);
+        defaultRenderSettings();
         
         tick();
     }

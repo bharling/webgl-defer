@@ -60,41 +60,65 @@ gbuffer_frag = """
 
 class DFIR.Gbuffer
   
-  constructor: (@width=512, @height=512) ->
-    @width = gl.viewportWidth
-    @height = gl.viewportHeight
+  constructor: (@resolution=1.0) ->
+    @width = gl.viewportWidth / @resolution
+    @height = gl.viewportHeight / @resolution
     @createFrameBuffer()
     
     
   createFrameBuffer: ->
     @ext = gl.getExtension 'WEBGL_draw_buffers'
+    
+    
+    @DepthEXT = gl.getExtension( "WEBKIT_WEBGL_depth_texture" ) or gl.getExtension( "WEBGL_depth_texture" )
+    
+    
     @frameBuffer = gl.createFramebuffer()
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
     
+    # create Texture Units
+    @albedoTextureUnit = @createTexture()
+    @normalsTextureUnit = @createTexture()
+    @depthTextureUnit = @createTexture()
+    @depthComponent = @createDepthTexture()
+    
+    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, @albedoTextureUnit, 0
+    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, @normalsTextureUnit, 0
+    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
+    gl.framebufferTexture2D gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, @depthComponent, 0
+    
+    
+    console.log( "GBuffer FrameBuffer status after initialization: " );
+    console.log( gl.checkFramebufferStatus( gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE );
+    
+    
+    # set draw targets
     @ext.drawBuffersWEBGL [
         @ext.COLOR_ATTACHMENT0_WEBGL,
         @ext.COLOR_ATTACHMENT1_WEBGL,
         @ext.COLOR_ATTACHMENT2_WEBGL
       ]
-    
-    # albedo
-    @albedoTextureUnit = @createTexture()
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, @albedoTextureUnit, 0
-    
-    # normals
-    @normalsTextureUnit = @createTexture()
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, @normalsTextureUnit, 0
-    
-    # depth
-    @depthTextureUnit = @createTexture()
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
+      
+    @release()
     
     # depth renderbuffer TODO: do we need this?
-    @renderBuffer = gl.createRenderbuffer()
-    gl.bindRenderbuffer gl.RENDERBUFFER, @renderBuffer
-    gl.renderbufferStorage gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, @width, @height
+    #@renderBuffer = gl.createRenderbuffer()
+    #gl.bindRenderbuffer gl.RENDERBUFFER, @renderBuffer
+    #gl.renderbufferStorage gl.RENDERBUFFER, gl.DEPTH_STENCIL, @width, @height
     
-    gl.framebufferRenderbuffer gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, @renderbuffer 
+    #gl.framebufferRenderbuffer gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, @renderbuffer 
+    
+    
+  createDepthTexture: ->
+    tex = gl.createTexture()
+    gl.bindTexture gl.TEXTURE_2D, tex
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, @width, @height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null)
+    tex
+
 
   createTexture: ->
     tex = gl.createTexture()
@@ -103,19 +127,17 @@ class DFIR.Gbuffer
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    
-    #gl.generateMipmap(gl.TEXTURE_2D)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @width, @height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     tex
 
   bind: ->
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
-    gl.bindRenderbuffer gl.RENDERBUFFER, @renderBuffer
+
 
   release : ->
-    gl.bindFramebuffer gl.FRAMEBUFFER, null
     gl.bindTexture gl.TEXTURE_2D, null
-    gl.bindRenderbuffer gl.RENDERBUFFER, null
+    gl.bindFramebuffer gl.FRAMEBUFFER, null
+    
     
   getDepthTextureUnit: ->
     @depthTextureUnit

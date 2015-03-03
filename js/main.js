@@ -1,5 +1,7 @@
 (function() {
   var buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, shader_type_enums,
+    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+    hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   exports = typeof exports !== 'undefined' ? exports : window;
@@ -34,6 +36,52 @@
 
   })();
 
+  DFIR.Object3D = (function() {
+    function Object3D() {
+      this.position = vec3.create(0.0, 0.0, 0.0);
+      this.rotationQuaternion = quat.create();
+      this.transformDirty = false;
+      this.transform = mat4.create();
+      this.children = [];
+    }
+
+    Object3D.prototype.setPosition = function(pos) {
+      this.position.x = pos.x;
+      this.position.y = pos.y;
+      this.position.z = pos.z;
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.update = function() {
+      if (this.transformDirty) {
+        mat4.fromRotationTranslation(this.transform, this.rotationQuaternion, this.position);
+        return this.transformDirty = false;
+      }
+    };
+
+    Object3D.prototype.addChild = function(childObject) {
+      return this.children.push(childObject);
+    };
+
+    Object3D.prototype.removeChild = function(childObject) {
+      return this.children.remove(childObject);
+    };
+
+    return Object3D;
+
+  })();
+
+  DFIR.Scene = (function(superClass) {
+    extend(Scene, superClass);
+
+    function Scene() {
+      return Scene.__super__.constructor.apply(this, arguments);
+    }
+
+    return Scene;
+
+  })(DFIR.Object3D);
+
   loadJSON = function(url, callback) {
     var request;
     request = new XMLHttpRequest();
@@ -47,7 +95,9 @@
     return request.send();
   };
 
-  DFIR.JSONGeometry = (function() {
+  DFIR.JSONGeometry = (function(superClass) {
+    extend(JSONGeometry, superClass);
+
     function JSONGeometry(url) {
       this.onDataLoaded = bind(this.onDataLoaded, this);
       loadJSON(url, this.onDataLoaded);
@@ -107,7 +157,7 @@
 
     return JSONGeometry;
 
-  })();
+  })(DFIR.Object3D);
 
   getShader = function(id) {
     var k, shader, shaderScript, str;
@@ -260,29 +310,42 @@
   gbuffer_frag = "#extension GL_EXT_draw_buffers : require\nprecision mediump float;\nvarying vec3 vNormal;\nvarying vec2 vTexCoords;\nvarying float depth;\n\nuniform float farClip;\nuniform float nearClip;\n\nvec4 pack (float depth) {\n  const vec4 bitSh = vec4(\n    256*256*256,\n    256*256,\n    256,\n    1.0\n  );\n  \n  const vec4 bitMask = vec4 (\n    0.0,\n    1.0 / 256.0,\n    1.0 / 256.0,\n    1.0 / 256.0\n  );\n  \n  vec4 comp = fract(depth * bitSh);\n  comp -= comp.xxyz * bitMask;\n  return comp;\n}\n\n\nvoid main (void) {\n  gl_FragData[0] = vec4(0.5,0.5,0.5,1.0);\n  gl_FragData[1] = vec4(vNormal, 1.0);\n  gl_FragData[2] = pack(1.0 - depth/farClip);\n}";
 
   DFIR.Gbuffer = (function() {
-    function Gbuffer(width, height) {
-      this.width = width != null ? width : 512;
-      this.height = height != null ? height : 512;
-      this.width = gl.viewportWidth;
-      this.height = gl.viewportHeight;
+    function Gbuffer(resolution) {
+      this.resolution = resolution != null ? resolution : 1.0;
+      this.width = gl.viewportWidth / this.resolution;
+      this.height = gl.viewportHeight / this.resolution;
       this.createFrameBuffer();
     }
 
     Gbuffer.prototype.createFrameBuffer = function() {
       this.ext = gl.getExtension('WEBGL_draw_buffers');
+      this.DepthEXT = gl.getExtension("WEBKIT_WEBGL_depth_texture") || gl.getExtension("WEBGL_depth_texture");
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-      this.ext.drawBuffersWEBGL([this.ext.COLOR_ATTACHMENT0_WEBGL, this.ext.COLOR_ATTACHMENT1_WEBGL, this.ext.COLOR_ATTACHMENT2_WEBGL]);
       this.albedoTextureUnit = this.createTexture();
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
       this.normalsTextureUnit = this.createTexture();
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
       this.depthTextureUnit = this.createTexture();
+      this.depthComponent = this.createDepthTexture();
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, this.depthTextureUnit, 0);
-      this.renderBuffer = gl.createRenderbuffer();
-      gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderBuffer);
-      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, this.width, this.height);
-      return gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depthComponent, 0);
+      console.log("GBuffer FrameBuffer status after initialization: ");
+      console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE);
+      this.ext.drawBuffersWEBGL([this.ext.COLOR_ATTACHMENT0_WEBGL, this.ext.COLOR_ATTACHMENT1_WEBGL, this.ext.COLOR_ATTACHMENT2_WEBGL]);
+      return this.release();
+    };
+
+    Gbuffer.prototype.createDepthTexture = function() {
+      var tex;
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, this.width, this.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+      return tex;
     };
 
     Gbuffer.prototype.createTexture = function() {
@@ -298,14 +361,12 @@
     };
 
     Gbuffer.prototype.bind = function() {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-      return gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderBuffer);
+      return gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
     };
 
     Gbuffer.prototype.release = function() {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.bindTexture(gl.TEXTURE_2D, null);
-      return gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+      return gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     };
 
     Gbuffer.prototype.getDepthTextureUnit = function() {
