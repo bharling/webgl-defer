@@ -34,18 +34,39 @@
 </script>
 
 <script id="fs_quad_frag" type="x-shader/x-fragment">
-  precision mediump float;
+  precision highp float;
   
   uniform sampler2D depthTexture;
   uniform sampler2D normalsTexture;
   
   varying vec2 vTexCoords;
   
+  
+  vec3 decodeNormal ( vec2 enc ) {
+  	vec2 fenc = enc * 4.0 - 2.0;
+  	float f = dot(fenc, fenc);
+  	float g = sqrt(1.0-f/4.0);
+  	vec3 n;
+  	n.xy = fenc*g;
+  	n.z = 1.0-f/2.0;
+  	return n;
+  }
+  
+  float decodeDepth( vec4 rgba ) {
+  	return dot( rgba, vec4( 1.0, 1.0/255.0, 1.0/65025.0, 1.0/160581375.0) );
+  }
+  
   void main (void) {
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    gl_FragColor = normalsSample;
-    //gl_FragColor = mix(depthSample, normalsSample, vTexCoords.x);
+    
+    vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
+    float decodedDepth = decodeDepth(depthSample);
+    
+    vec4 d = vec4(decodedDepth, decodedDepth,decodedDepth, 1.0);
+    
+    //gl_FragColor = decodedNormal;
+    gl_FragColor = mix(d, decodedNormal, vTexCoords.x > 0.5 ? 1.0 : 0.0);
   }
 </script>
 
@@ -66,9 +87,8 @@
       vTexCoords = aVertexTextureCoords;
       gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    
       depth = -gl_Position.z;
-      //vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
-      //vNormal = vec3(n.xyz);
-      vNormal = aVertexNormal;
+      vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
+      vNormal = vec3(n.xyz);
   }
 </script>
 
@@ -82,31 +102,23 @@
   uniform float farClip;
   uniform float nearClip;
   
-  vec4 pack (float depth) {
-    const vec4 bitSh = vec4(
-      256*256*256,
-      256*256,
-      256,
-      1.0
-    );
-    
-    const vec4 bitMask = vec4 (
-      0.0,
-      1.0 / 256.0,
-      1.0 / 256.0,
-      1.0 / 256.0
-    );
-    
-    vec4 comp = fract(depth * bitSh);
-    comp -= comp.xxyz * bitMask;
-    return comp;
+  vec4 pack (float v) {
+	vec4 enc = vec4(1.0, 255.0, 65025.0, 160581375.0) * v;
+  	enc = fract(enc);
+  	enc -= enc.yzww * vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0);
+  	return enc;
   }
   
   
+	vec4 encodeNormal ( vec3 n ) {
+		float p = sqrt(n.z * 8.0 + 8.0);
+		return vec4(n.xy / p + 0.5, 0.0, 1.0);
+	}
+  
   void main (void) {
     gl_FragData[0] = vec4(0.5,0.5,0.5,1.0);
-    gl_FragData[1] = vec4(vNormal, 1.0);
-    gl_FragData[2] = pack(1.0 - depth/farClip);
+    gl_FragData[1] = encodeNormal( vNormal );
+    gl_FragData[2] = pack(depth/farClip);
   }
 </script>
 
@@ -117,6 +129,9 @@
 	varying vec3 vNormal;
 	varying vec2 vTexCoords;
 	varying float depth;
+	
+	
+
 	
 	
 	vec4 pack (float depth) {
@@ -345,7 +360,8 @@
     	
     	gbuffer.bind();
     	
-    	gl.cullFace ( gl.BACK) ;
+    	gl.cullFace ( gl.BACK ) ;
+    	gl.blendFunc( gl.ONE, gl.ZERO );
     	
     	// set viewport dims
         // gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
@@ -372,8 +388,7 @@
         if (teapot.bind() ) {
         	teapot.material.use();
         	teapot.setMatrixUniforms(mvMatrix, pMatrix);
-        	teapot.setFloatUniform('farClip', 100.0);
-        
+        	teapot.setFloatUniform('farClip', 50.0);
         	teapot.draw();
         }
         

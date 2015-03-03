@@ -1,6 +1,7 @@
 class DFIR.Object3D
   constructor: ->
-    @position = vec3.create 0.0, 0.0, 0.0
+    @position = vec3.create()
+    @scale = vec3.create()
     @rotationQuaternion = quat.create()
     @transformDirty = false
     @transform = mat4.create()
