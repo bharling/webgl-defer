@@ -1,5 +1,5 @@
 (function() {
-  var buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, shader_type_enums,
+  var buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -38,7 +38,8 @@
 
   DFIR.Object3D = (function() {
     function Object3D() {
-      this.position = vec3.create(0.0, 0.0, 0.0);
+      this.position = vec3.create();
+      this.scale = vec3.create();
       this.rotationQuaternion = quat.create();
       this.transformDirty = false;
       this.transform = mat4.create();
@@ -110,7 +111,7 @@
     };
 
     JSONGeometry.prototype.bind = function() {
-      if (!this.material || !this.loaded) {
+      if (!this.material || !this.loaded || !this.material.diffuseMapLoaded || !this.material.normalMapLoaded) {
         return false;
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer.get());
@@ -120,6 +121,10 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer.get());
       gl.vertexAttribPointer(this.material.getAttribute('aVertexNormal'), this.vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
       return true;
+    };
+
+    JSONGeometry.prototype.release = function() {
+      return gl.bindBuffer(gl.ARRAY_BUFFER, null);
     };
 
     JSONGeometry.prototype.setMatrixUniforms = function(mvMatrix, pMatrix) {
@@ -252,10 +257,31 @@
     return result;
   };
 
+  loadTexture = function(url, callback) {
+    var tex;
+    tex = gl.createTexture();
+    tex.image = new Image();
+    tex.image.onload = (function() {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex.image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return callback(tex);
+    });
+    return tex.image.src = url;
+  };
+
   DFIR.Shader = (function() {
     function Shader(vertSourceId, fragSourceId) {
+      this.name = vertSourceId;
       this.program = buildProgram(vertSourceId, fragSourceId);
       this.params = getShaderParams(this.program);
+      this.diffuseMapLoaded = this.normalMapLoaded = false;
       this.buildUniforms();
       this.buildAttributes();
     }
@@ -289,8 +315,27 @@
     };
 
     Shader.prototype.showInfo = function() {
+      console.log(this.name);
       console.table(this.params.uniforms);
       return console.table(this.params.attributes);
+    };
+
+    Shader.prototype.setDiffuseMap = function(url) {
+      return loadTexture(url, (function(_this) {
+        return function(texture) {
+          _this.diffuseMap = texture;
+          return _this.diffuseMapLoaded = true;
+        };
+      })(this));
+    };
+
+    Shader.prototype.setNormalMap = function(url) {
+      return loadTexture(url, (function(_this) {
+        return function(texture) {
+          _this.normalMap = texture;
+          return _this.normalMapLoaded = true;
+        };
+      })(this));
     };
 
     Shader.prototype.getUniform = function(name) {

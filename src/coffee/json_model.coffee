@@ -24,7 +24,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   
     
   bind : ->
-    if !@material or !@loaded
+    if !@material or !@loaded or !@material.diffuseMapLoaded or !@material.normalMapLoaded
       return false
     
     gl.bindBuffer gl.ARRAY_BUFFER, @vertexPositionBuffer.get()
@@ -35,7 +35,10 @@ class DFIR.JSONGeometry extends DFIR.Object3D
     
     gl.bindBuffer gl.ARRAY_BUFFER, @vertexNormalBuffer.get()
     gl.vertexAttribPointer @material.getAttribute( 'aVertexNormal' ), @vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0
-    return true 
+    return true
+    
+  release: ->
+    gl.bindBuffer gl.ARRAY_BUFFER, null
   
   setMatrixUniforms: (mvMatrix, pMatrix) ->
     if !@material
@@ -57,6 +60,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   onDataLoaded: (data) =>
     @vertexPositionBuffer = new DFIR.Buffer( new Float32Array( data.vertexPositions ), 3, gl.STATIC_DRAW )
     @vertexTextureCoordBuffer = new DFIR.Buffer( new Float32Array( data.vertexTextureCoords ), 2, gl.STATIC_DRAW )
+    
     @vertexNormalBuffer = new DFIR.Buffer( new Float32Array( data.vertexNormals ), 3, gl.STATIC_DRAW )
     @vertexIndexBuffer = new DFIR.Buffer( new Uint16Array( data.indices ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
     @loaded = true

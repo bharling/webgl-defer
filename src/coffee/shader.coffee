@@ -86,11 +86,30 @@ getShaderParams = (program) ->
     result.attributeCount += attribute.size
   result
   
+  
+loadTexture = (url, callback) ->
+  tex = gl.createTexture()
+  tex.image = new Image()
+  tex.image.onload = ( ->
+    gl.bindTexture gl.TEXTURE_2D, tex
+    gl.pixelStorei gl.UNPACK_FLIP_Y_WEBGL, true
+    gl.texImage2D gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex.image
+    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST
+    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST
+    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT
+    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT
+    gl.generateMipmap gl.TEXTURE_2D
+    gl.bindTexture gl.TEXTURE_2D, null
+    callback tex )
+  tex.image.src = url
+  
 
 class DFIR.Shader
   constructor: (vertSourceId, fragSourceId) ->
+    @name = vertSourceId
     @program = buildProgram vertSourceId, fragSourceId
     @params = getShaderParams @program
+    @diffuseMapLoaded = @normalMapLoaded = false
     @buildUniforms()
     @buildAttributes()
     
@@ -108,8 +127,19 @@ class DFIR.Shader
     gl.useProgram @program
     
   showInfo: ->
+    console.log @name
     console.table @params.uniforms
     console.table @params.attributes
+    
+  setDiffuseMap: (url) ->
+    loadTexture url, (texture) =>
+      @diffuseMap = texture
+      @diffuseMapLoaded = true
+      
+  setNormalMap: (url) ->
+    loadTexture url, (texture) =>
+      @normalMap = texture
+      @normalMapLoaded = true
     
   getUniform: (name) ->
     return @uniforms[name]
