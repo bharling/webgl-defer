@@ -44,6 +44,17 @@
   
   varying vec2 vTexCoords;
   
+  #define PI 3.1415926535897932384626433832795
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   vec3 reconstructPosition( float p_depth, vec2 p_ndc ) {
   	//p_ndc = p_ndc * 2.0 - 1.0;
@@ -51,6 +62,21 @@
   	float viewDepth = projectionParams.w / (depth - projectionParams.z);
   	
   	return vec3((p_ndc * viewDepth) / projectionParams.xy, viewDepth);
+  }
+  
+  
+  
+  float chiGGX ( float v ) {
+  	return v > 0.0 ? 1.0 : 0.0;
+  }
+  
+  
+  float GGX_Distribution( vec3 n, vec3 h, float alpha ) {
+  	float NoH = dot(n,h);
+  	float alpha2 = alpha * alpha;
+  	float NoH2 = NoH * NoH;
+  	float den = NoH2 * alpha2 + (1.0-NoH2);
+  	return (chiGGX(NoH) * alpha2) / (PI * den * den);
   }
   
   
@@ -70,16 +96,16 @@
   
   void main (void) {
   	
-  	const vec3 specularColor = vec3(3.0);
-  	const float specularExponent = 20.0;
+  	const vec3 specularColor = vec3(1.0);
+  	const float specularExponent = 40.0;
   	
   	
   	
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    //vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
     
-    vec3 matColor = vec3(0.3, 0.21, 0.24);
+    //vec3 matColor = vec3(0.3, 0.21, 0.24);
     matColor = pow ( matColor, vec3(2.2));
     
     vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
@@ -130,9 +156,11 @@
     
     lin += ind*vec3(0.40,0.28,0.20);
     
-    lin += specularColor * specVal;
+    //lin += specularColor * specVal;
     
     vec3 color = matColor * lin;
+    
+    color = mix(color, specularColor, specVal);
     
     color = pow( color, vec3(1.0/2.2) );
     
@@ -155,6 +183,7 @@
   varying vec2 vTexCoords;
   varying float depth;
   varying vec3 vNormal;
+  varying vec3 vEyeDirection;
   
   void main (void) {
       vTexCoords = vec2(aVertexTextureCoords.x,aVertexTextureCoords.y);
@@ -163,21 +192,21 @@
       depth = -gl_Position.z;
       vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
       vNormal = vec3(n.xyz);
+      vEyeDirection = -gl_Position.xyz;
   }
 </script>
 
 <script id="gbuffer_frag" type="x-shader/x-fragment">
   #extension GL_EXT_draw_buffers : require
+  #extension GL_OES_standard_derivatives : require
   precision highp float;
   varying vec3 vNormal;
+  varying vec3 vEyeDirection;
   varying vec2 vTexCoords;
   varying float depth;
   
   uniform float farClip;
   uniform float nearClip;
-  
-  
-  
   uniform sampler2D diffuseTex;
   uniform sampler2D normalTex;
   
@@ -188,6 +217,36 @@
   	return enc;
   }
   
+  // Begin no-tangents normal mapping
+  mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
+  	// get edge vectors of the pixel triangle
+    vec3 dp1 = dFdx( p );
+    vec3 dp2 = dFdy( p );
+    vec2 duv1 = dFdx( uv );
+    vec2 duv2 = dFdy( uv );
+ 
+    // solve the linear system
+    vec3 dp2perp = cross( dp2, N );
+    vec3 dp1perp = cross( N, dp1 );
+    vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+    vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+ 
+    // construct a scale-invariant frame 
+    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+    return mat3( T * invmax, B * invmax, N );
+  }
+  
+  vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ) {
+  	vec3 map = texture2D( normalTex, texcoord ).xyz;
+  	map = map * 255.0/127.0 - 128.0/127.0;
+  	mat3 TBN = cotangent_frame(N, -V, texcoord);
+  	return normalize(TBN * map);
+  }
+  
+  
+  
+  // end no-tangents normal mapping
+  
   
 	vec4 encodeNormal ( vec3 n ) {
 		float p = sqrt(n.z * 8.0 + 8.0);
@@ -195,6 +254,8 @@
 	}
   
   void main (void) {
+  	vec3 PN = perturb_normal( vNormal, vEyeDirection, vTexCoords );
+  	//vec4 n = encodeNormal( PN );
   	
   	vec4 n = encodeNormal( vNormal );
   	
@@ -216,12 +277,16 @@
 
 <script type="text/javascript">
 
-    var gl;
+    var gl, deriv_ext;
     function initGL(canvas) {
         try {
             gl = canvas.getContext("webgl");
             gl.viewportWidth = canvas.width;
             gl.viewportHeight = canvas.height;
+            
+            deriv_ext = gl.getExtension('OES_standard_derivatives');
+            
+            
         } catch (e) {
         }
         if (!gl) {

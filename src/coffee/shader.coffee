@@ -104,6 +104,14 @@ loadTexture = (url, callback) ->
   tex.image.src = url
   
 
+class DFIR.TextureMapTypes
+  @DIFFUSE = 0x01
+  @NORMAL = 0x02
+  @SPECULAR = 0x03
+  @CUBE = 0x04
+  @SPHERE = 0x05
+  
+
 class DFIR.Shader
   constructor: (vertSourceId, fragSourceId) ->
     @name = vertSourceId

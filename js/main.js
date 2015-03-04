@@ -44,6 +44,7 @@
       this.transformDirty = false;
       this.transform = mat4.create();
       this.children = [];
+      this.visible = true;
     }
 
     Object3D.prototype.setPosition = function(pos) {
@@ -51,6 +52,21 @@
       this.position.y = pos.y;
       this.position.z = pos.z;
       return this.transformDirty = true;
+    };
+
+    Object3D.prototype.visit = function(func) {
+      var c, j, len, ref, results;
+      if (!this.visible) {
+        return;
+      }
+      func(this);
+      ref = this.children;
+      results = [];
+      for (j = 0, len = ref.length; j < len; j++) {
+        c = ref[j];
+        results.push(c.visit(func));
+      }
+      return results;
     };
 
     Object3D.prototype.update = function() {
@@ -80,6 +96,25 @@
     }
 
     return Scene;
+
+  })(DFIR.Object3D);
+
+  DFIR.Mesh = (function(superClass) {
+    extend(Mesh, superClass);
+
+    function Mesh(geometry, shader1) {
+      this.geometry = geometry;
+      this.shader = shader1;
+      Mesh.__super__.constructor.call(this);
+      if (this.geometry == null) {
+        this.geometry = new DFIR.Geometry();
+      }
+      if (this.shader == null) {
+        this.shader = new DFIR.BasicShader();
+      }
+    }
+
+    return Mesh;
 
   })(DFIR.Object3D);
 
@@ -279,6 +314,23 @@
     });
     return tex.image.src = url;
   };
+
+  DFIR.TextureMapTypes = (function() {
+    function TextureMapTypes() {}
+
+    TextureMapTypes.DIFFUSE = 0x01;
+
+    TextureMapTypes.NORMAL = 0x02;
+
+    TextureMapTypes.SPECULAR = 0x03;
+
+    TextureMapTypes.CUBE = 0x04;
+
+    TextureMapTypes.SPHERE = 0x05;
+
+    return TextureMapTypes;
+
+  })();
 
   DFIR.Shader = (function() {
     function Shader(vertSourceId, fragSourceId) {

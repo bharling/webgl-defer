@@ -70,6 +70,7 @@ class DFIR.Gbuffer
     @ext = gl.getExtension 'WEBGL_draw_buffers'
     
     
+    
     @DepthEXT = gl.getExtension( "WEBKIT_WEBGL_depth_texture" ) or gl.getExtension( "WEBGL_depth_texture" )
     
     
