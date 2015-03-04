@@ -139,6 +139,10 @@
       return gl.uniform1f(this.material.getUniform(name), val);
     };
 
+    JSONGeometry.prototype.setVec4Uniform = function(name, x, y, z, w) {
+      return gl.uniform4f(this.material.getUniform(name), x, y, z, w);
+    };
+
     JSONGeometry.prototype.draw = function() {
       if (!this.material || !this.loaded) {
         return;

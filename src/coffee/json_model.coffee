@@ -50,6 +50,10 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   setFloatUniform: (name, val) ->
     gl.uniform1f @material.getUniform(name), val
     
+  setVec4Uniform: (name, x, y, z, w) ->
+    gl.uniform4f @material.getUniform(name), x, y, z, w
+    
+    
   draw : ->
     if !@material or !@loaded
       return
