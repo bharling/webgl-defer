@@ -70,14 +70,16 @@
   
   void main (void) {
   	
-  	const vec3 specularColor = vec3(1.4);
+  	const vec3 specularColor = vec3(3.0);
   	const float specularExponent = 20.0;
   	
   	
   	
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    //vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    
+    vec3 matColor = vec3(0.3, 0.21, 0.24);
     matColor = pow ( matColor, vec3(2.2));
     
     vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
