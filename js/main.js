@@ -146,15 +146,23 @@
     };
 
     JSONGeometry.prototype.bind = function() {
+      var normalsAttrib, positionAttrib, texCoordsAttrib;
       if (!this.material || !this.loaded || !this.material.diffuseMapLoaded || !this.material.normalMapLoaded) {
         return false;
       }
+      this.material.use();
+      positionAttrib = this.material.getAttribute('aVertexPosition');
+      texCoordsAttrib = this.material.getAttribute('aVertexTextureCoords');
+      normalsAttrib = this.material.getAttribute('aVertexNormal');
+      gl.enableVertexAttribArray(positionAttrib);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer.get());
-      gl.vertexAttribPointer(this.material.getAttribute('aVertexPosition'), this.vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(positionAttrib, this.vertexPositionBuffer.itemSize, gl.FLOAT, false, 12, 0);
+      gl.enableVertexAttribArray(texCoordsAttrib);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTextureCoordBuffer.get());
-      gl.vertexAttribPointer(this.material.getAttribute('aVertexTextureCoords'), this.vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(texCoordsAttrib, this.vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 8, 0);
+      gl.enableVertexAttribArray(normalsAttrib);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer.get());
-      gl.vertexAttribPointer(this.material.getAttribute('aVertexNormal'), this.vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(normalsAttrib, this.vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0);
       return true;
     };
 
@@ -182,7 +190,6 @@
       if (!this.material || !this.loaded) {
         return;
       }
-      this.material.use();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
       return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
     };

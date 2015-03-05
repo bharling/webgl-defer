@@ -27,14 +27,24 @@ class DFIR.JSONGeometry extends DFIR.Object3D
     if !@material or !@loaded or !@material.diffuseMapLoaded or !@material.normalMapLoaded
       return false
     
+    @material.use()
+    
+    positionAttrib = @material.getAttribute( 'aVertexPosition')
+    texCoordsAttrib = @material.getAttribute( 'aVertexTextureCoords')
+    normalsAttrib = @material.getAttribute( 'aVertexNormal' )
+    
+    
+    gl.enableVertexAttribArray positionAttrib
     gl.bindBuffer gl.ARRAY_BUFFER, @vertexPositionBuffer.get()
-    gl.vertexAttribPointer @material.getAttribute( 'aVertexPosition'), @vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0
+    gl.vertexAttribPointer positionAttrib, @vertexPositionBuffer.itemSize, gl.FLOAT, false, 12, 0
     
+    gl.enableVertexAttribArray texCoordsAttrib
     gl.bindBuffer gl.ARRAY_BUFFER, @vertexTextureCoordBuffer.get()
-    gl.vertexAttribPointer @material.getAttribute( 'aVertexTextureCoords'), @vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0
+    gl.vertexAttribPointer texCoordsAttrib, @vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 8, 0
     
+    gl.enableVertexAttribArray normalsAttrib
     gl.bindBuffer gl.ARRAY_BUFFER, @vertexNormalBuffer.get()
-    gl.vertexAttribPointer @material.getAttribute( 'aVertexNormal' ), @vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0
+    gl.vertexAttribPointer normalsAttrib, @vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0
     return true
     
   release: ->
@@ -57,14 +67,13 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   draw : ->
     if !@material or !@loaded
       return
-    @material.use()
+    
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
     gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
     
   onDataLoaded: (data) =>
     @vertexPositionBuffer = new DFIR.Buffer( new Float32Array( data.vertexPositions ), 3, gl.STATIC_DRAW )
     @vertexTextureCoordBuffer = new DFIR.Buffer( new Float32Array( data.vertexTextureCoords ), 2, gl.STATIC_DRAW )
-    
     @vertexNormalBuffer = new DFIR.Buffer( new Float32Array( data.vertexNormals ), 3, gl.STATIC_DRAW )
     @vertexIndexBuffer = new DFIR.Buffer( new Uint16Array( data.indices ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
     @loaded = true
