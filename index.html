@@ -38,6 +38,7 @@
   uniform sampler2D albedoTexture;
   
   uniform vec4 projectionParams;
+  uniform mat4 inverseProjectionMatrix;
   
   varying vec2 vTexCoords;
   
@@ -55,10 +56,20 @@
   
   vec3 reconstructPosition( float p_depth, vec2 p_ndc ) {
   	//p_ndc = p_ndc * 2.0 - 1.0;
-  	float depth = p_depth * 2.0 - 1.0;
-  	float viewDepth = projectionParams.w / (depth - projectionParams.z);
+  	//float depth = p_depth * 2.0 - 1.0;
+  	//float viewDepth = projectionParams.w / (depth - projectionParams.z);
   	
-  	return vec3((p_ndc * viewDepth) / projectionParams.xy, viewDepth);
+  	//return vec3((p_ndc * viewDepth) / projectionParams.xy, viewDepth);
+  	
+  	float x = p_ndc.x;//p_ndc.x * 2.0 - 1.0;
+    float y = p_ndc.y;//(1.0 - p_ndc.y) * 2.0 - 1.0;
+    vec4 vProjectedPos = vec4(x, y, p_depth, 1.0);
+    // Transform by the inverse projection matrix
+    vec4 vPositionVS = vProjectedPos * inverseProjectionMatrix;  
+    // Divide by w to get the view-space position
+    return vPositionVS.xyz / vPositionVS.w;  
+  	
+  	
   }
   
   
@@ -100,12 +111,19 @@
   	
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    //vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    
+    vec3 matColor = vec3(0.5, 0.26, 0.24);
     
     //vec3 matColor = vec3(0.3, 0.21, 0.24);
     matColor = pow ( matColor, vec3(2.2));
     
     vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
+    
+    gl_FragColor = decodedNormal;
+    //return;
+    
+    
     float decodedDepth = decodeDepth(depthSample);
     
     vec3 worldPosition = reconstructPosition( decodedDepth, vTexCoords );
@@ -136,7 +154,7 @@
     
     float base = 1.0 - dot(eyeDirection, H);
     float exponential = pow(base, 5.0);
-    float fresnel = exponential + 1.4 * (1.0 - exponential);
+    float fresnel = exponential + 0.6 * (1.0 - exponential);
     specVal *= fresnel;
     
     float sun = clamp( dot( decodedNormal.xyz, sunDir), 0.0, 1.0);
@@ -179,7 +197,7 @@
   uniform mat3 uNormalMatrix;
   
   varying vec2 vTexCoords;
-  varying float depth;
+  varying vec2 depthClipSpace;
   varying vec3 vNormal;
   varying vec3 vEyeDirection;
   
@@ -187,7 +205,7 @@
       vTexCoords = aVertexTextureCoords;
       gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
       vec4 worldPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
-      depth = -gl_Position.z;
+      depthClipSpace = gl_Position.zw;
       
       vNormal = uNormalMatrix * aVertexNormal;
       
@@ -204,7 +222,7 @@
   varying vec3 vNormal;
   varying vec3 vEyeDirection;
   varying vec2 vTexCoords;
-  varying float depth;
+  varying vec2 depthClipSpace;
   
   uniform float farClip;
   uniform float nearClip;
@@ -255,14 +273,15 @@
 	}
   
   void main (void) {
-  	vec3 PN = perturb_normal( vNormal, vEyeDirection, vTexCoords );
-  	vec4 n = encodeNormal( PN );
+  	vec3 tNormal = vNormal * 0.5 + 0.5;
+  	vec3 PN = perturb_normal( tNormal, vEyeDirection, vTexCoords );
+  	vec4 n = encodeNormal( tNormal );
   	
   	//vec4 n = encodeNormal( vNormal );
   	
     gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
     gl_FragData[1] = n;
-    gl_FragData[2] = pack(depth/farClip);
+    gl_FragData[2] = pack(-depthClipSpace.x / farClip);
   }
 </script>
 
@@ -453,12 +472,32 @@
         mvPushMatrix();
         
         // rotate by the current triangle rotation
-        mat4.rotate(mvMatrix, degToRad(rTri), [0,1,Math.sin(rTri*0.001)]);
+        //mat4.rotate(mvMatrix, degToRad(rTri), [0,1,Math.sin(rTri*0.001)]);
+        
+        
+        camera.updateViewMatrix();
+        camera.updateProjectionMatrix();
+        
+        var worldMatrix = teapot.getWorldTransform();
+        
+        //mat4.scale(worldMatrix, [0.4, 0.4, 0.4]);
+        
+        var angle = degToRad(rTri);
+        var radius = 40.0;
+        
+        
+        camera.setPosition([ radius * Math.sin(angle), 15.0, radius * Math.cos(angle) ]);
+        
+        var viewMatrix = camera.getViewMatrix();
+        
+        var worldViewMatrix = mat4.create();
+        
+        mat4.multiply( viewMatrix, worldMatrix, worldViewMatrix );
         
         
         var normalMatrix = mat3.create();
         
-        mat4.toInverseMat3(mvMatrix, normalMatrix);
+        mat4.toInverseMat3(worldMatrix, normalMatrix);
         mat3.transpose(normalMatrix);
         
         
@@ -466,11 +505,11 @@
         
         if (teapot.bind() ) {
         	teapot.material.use();
-        	teapot.setMatrixUniforms(mvMatrix, pMatrix);
+        	teapot.setMatrixUniforms(worldViewMatrix, camera.getProjectionMatrix());
         	
         	gl.uniformMatrix3fv(teapot.material.getUniform('uNormalMatrix'), false, normalMatrix);
         	
-        	teapot.setFloatUniform('farClip', 40.0);
+        	teapot.setFloatUniform('farClip', camera.far);
         	
         	
         	// bind textures
@@ -509,6 +548,8 @@
         gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
         gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
         gl.uniform1i(quad.material.getUniform('albedoTexture'), 2);
+        
+        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
         
         gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
         
@@ -585,7 +626,7 @@
 		animate();
 	}
 
-	var teapot, quad;
+	var teapot, quad, camera;
 
 	function loadModel () {
 		teapot = new DFIR.JSONGeometry('models/teapot.json');
@@ -593,10 +634,15 @@
 		teapot.material.setDiffuseMap('textures/diffuse.jpg');
 		teapot.material.setNormalMap('textures/normals.png');
 		teapot.material.showInfo();
+		teapot.setPosition( [0.0, 0.0, 0.0]);
+		teapot.setScale([0.7, 0.7, 0.7]); 
 		
 		quad = new DFIR.FullscreenQuad();
 		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
 		quad.material.showInfo();
+		
+		camera = new DFIR.Camera()
+		camera.setPosition([ 0.0, 1.0, 20.0 ]); 
 		
 	}
 

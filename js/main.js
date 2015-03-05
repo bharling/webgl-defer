@@ -40,17 +40,38 @@
     function Object3D() {
       this.position = vec3.create();
       this.scale = vec3.create();
-      this.rotationQuaternion = quat.create();
-      this.transformDirty = false;
-      this.transform = mat4.create();
+      this.transformDirty = true;
+      this.worldTransform = mat4.create();
       this.children = [];
       this.visible = true;
     }
 
+    Object3D.prototype.getWorldTransform = function() {
+      if (this.transformDirty === true) {
+        this.updateWorldTransform();
+        console.log(this, this.worldTransform);
+      }
+      return this.worldTransform;
+    };
+
+    Object3D.prototype.updateWorldTransform = function(parentTransform) {
+      mat4.identity(this.worldTransform);
+      mat4.translate(this.worldTransform, this.position);
+      mat4.scale(this.worldTransform, this.scale);
+      this.transformDirty = false;
+    };
+
     Object3D.prototype.setPosition = function(pos) {
-      this.position.x = pos.x;
-      this.position.y = pos.y;
-      this.position.z = pos.z;
+      this.position[0] = pos[0];
+      this.position[1] = pos[1];
+      this.position[2] = pos[2];
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.setScale = function(s) {
+      this.scale[0] = s[0];
+      this.scale[1] = s[1];
+      this.scale[2] = s[2];
       return this.transformDirty = true;
     };
 
@@ -136,6 +157,7 @@
 
     function JSONGeometry(url) {
       this.onDataLoaded = bind(this.onDataLoaded, this);
+      JSONGeometry.__super__.constructor.call(this);
       loadJSON(url, this.onDataLoaded);
       this.material = null;
       this.loaded = false;
@@ -412,6 +434,63 @@
     return Shader;
 
   })();
+
+  DFIR.Camera = (function(superClass) {
+    extend(Camera, superClass);
+
+    function Camera() {
+      Camera.__super__.constructor.call(this);
+      this.target = vec3.create();
+      this.fov = 45.0;
+      this.up = vec3.create([0.0, 1.0, 0.0]);
+      this.viewMatrix = mat4.create();
+      this.near = 0.0;
+      this.far = 100.0;
+      this.updateViewMatrix();
+      this.projectionMatrix = mat4.create();
+      this.updateProjectionMatrix();
+    }
+
+    Camera.prototype.setFarClip = function(far) {
+      this.far = far;
+      return this.updateProjectionMatrix();
+    };
+
+    Camera.prototype.setNearClip = function(near) {
+      this.near = near;
+      return this.updateProjectionMatrix();
+    };
+
+    Camera.prototype.getViewMatrix = function() {
+      return this.viewMatrix;
+    };
+
+    Camera.prototype.getProjectionMatrix = function() {
+      return this.projectionMatrix;
+    };
+
+    Camera.prototype.getInverseProjectionMatrix = function() {
+      var invProjMatrix;
+      invProjMatrix = mat4.create();
+      mat4.inverse(this.projectionMatrix, invProjMatrix);
+      return invProjMatrix;
+    };
+
+    Camera.prototype.updateViewMatrix = function() {
+      mat4.identity(this.viewMatrix);
+      return mat4.lookAt(this.position, this.target, this.up, this.viewMatrix);
+    };
+
+    Camera.prototype.updateProjectionMatrix = function() {
+      var aspect;
+      mat4.identity(this.projectionMatrix);
+      aspect = gl.viewportWidth / gl.viewportHeight;
+      return mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, this.projectionMatrix);
+    };
+
+    return Camera;
+
+  })(DFIR.Object3D);
 
   gbuffer_vert = "\nattribute vec3 aVertexNormal;\nattribute vec3 aVertexPosition;\nattribute vec2 aVertexTextureCoords;\n\nuniform mat4 uMVMatrix;\nuniform mat4 uPMatrix;\n\nvarying vec2 vTexCoords;\nvarying float depth;\nvarying vNormal;\n\nvoid main (void) {\n    vTexCoords = aVertexTextureCoords;\n    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    \n    depth = gl_Position.z;\n    vec4 n = uMVMatrix * vec4(aVertexNormal, 1.0);\n    vNormal = vec3(n.xyz);\n}";
 

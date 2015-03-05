@@ -2,16 +2,35 @@ class DFIR.Object3D
   constructor: ->
     @position = vec3.create()
     @scale = vec3.create()
-    @rotationQuaternion = quat.create()
-    @transformDirty = false
-    @transform = mat4.create()
+    #@rotationQuaternion = quat.create()
+    @transformDirty = true
+    @worldTransform = mat4.create()
     @children = []
     @visible = true
     
+  getWorldTransform: () ->
+    if @transformDirty is true
+      @updateWorldTransform()
+      console.log @, @worldTransform
+    @worldTransform
+      
+  updateWorldTransform: (parentTransform) ->
+    mat4.identity @worldTransform
+    mat4.translate @worldTransform, @position
+    mat4.scale @worldTransform, @scale
+    @transformDirty = false
+    return
+    
   setPosition: (pos) ->
-    @position.x = pos.x
-    @position.y = pos.y
-    @position.z = pos.z
+    @position[0] = pos[0]
+    @position[1] = pos[1]
+    @position[2] = pos[2]
+    @transformDirty = true
+    
+  setScale: (s) ->
+    @scale[0] = s[0]
+    @scale[1] = s[1]
+    @scale[2] = s[2]
     @transformDirty = true
     
   visit: (func) ->
