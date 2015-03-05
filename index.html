@@ -105,7 +105,7 @@
   void main (void) {
   	
   	const vec3 specularColor = vec3(1.0);
-  	const float specularExponent = 40.0;
+  	const float specularExponent = 15.0;
   	
   	
   	
@@ -154,7 +154,7 @@
     
     float base = 1.0 - dot(eyeDirection, H);
     float exponential = pow(base, 5.0);
-    float fresnel = exponential + 0.6 * (1.0 - exponential);
+    float fresnel = exponential + 1.44 * (1.0 - exponential);
     specVal *= fresnel;
     
     float sun = clamp( dot( decodedNormal.xyz, sunDir), 0.0, 1.0);
@@ -171,11 +171,11 @@
     
     lin += ind*vec3(0.40,0.28,0.20);
     
-    //lin += specularColor * specVal;
+    lin += specularColor * specVal;
     
     vec3 color = matColor * lin;
     
-    color = mix(color, specularColor, specVal);
+    //color = mix(color, specularColor, specVal);
     
     color = pow( color, vec3(1.0/2.2) );
     
@@ -475,8 +475,7 @@
         //mat4.rotate(mvMatrix, degToRad(rTri), [0,1,Math.sin(rTri*0.001)]);
         
         
-        camera.updateViewMatrix();
-        camera.updateProjectionMatrix();
+        
         
         var worldMatrix = teapot.getWorldTransform();
         
@@ -487,6 +486,8 @@
         
         
         camera.setPosition([ radius * Math.sin(angle), 15.0, radius * Math.cos(angle) ]);
+        camera.updateViewMatrix();
+        camera.updateProjectionMatrix();
         
         var viewMatrix = camera.getViewMatrix();
         
