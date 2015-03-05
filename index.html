@@ -179,6 +179,7 @@
   
   uniform mat4 uMVMatrix;
   uniform mat4 uPMatrix;
+  uniform mat3 uNormalMatrix;
   
   varying vec2 vTexCoords;
   varying float depth;
@@ -190,8 +191,11 @@
       gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
       vec4 worldPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
       depth = -gl_Position.z;
-      vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
-      vNormal = vec3(n.xyz);
+      
+      vNormal = uNormalMatrix * aVertexNormal;
+      
+      //vec4 n = normalize(uMVMatrix * vec4(aVertexNormal, 1.0));
+      //vNormal = vec3(n.xyz);
       vEyeDirection = -gl_Position.xyz;
   }
 </script>
@@ -455,9 +459,20 @@
         mat4.rotate(mvMatrix, degToRad(rTri), [0,1,Math.sin(rTri*0.001)]);
         
         
+        var normalMatrix = mat3.create();
+        
+        mat4.toInverseMat3(mvMatrix, normalMatrix);
+        mat3.transpose(normalMatrix);
+        
+        
+        
+        
         if (teapot.bind() ) {
         	teapot.material.use();
         	teapot.setMatrixUniforms(mvMatrix, pMatrix);
+        	
+        	gl.uniformMatrix3fv(teapot.material.getUniform('uNormalMatrix'), false, normalMatrix);
+        	
         	teapot.setFloatUniform('farClip', 40.0);
         	
         	
