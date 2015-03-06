@@ -444,8 +444,8 @@
       this.fov = 45.0;
       this.up = vec3.create([0.0, 1.0, 0.0]);
       this.viewMatrix = mat4.create();
-      this.near = 0.0;
-      this.far = 100.0;
+      this.near = 1.0;
+      this.far = 60.0;
       this.updateViewMatrix();
       this.projectionMatrix = mat4.create();
       this.updateProjectionMatrix();
@@ -467,6 +467,27 @@
 
     Camera.prototype.getProjectionMatrix = function() {
       return this.projectionMatrix;
+    };
+
+    Camera.prototype.getFrustumCorners = function() {
+      var Cfar, Cnear, Hfar, Hnear, Wfar, Wnear, ar, fov, v, w;
+      v = vec3.create();
+      vec3.sub(this.target, this.position, v);
+      vec3.normalize(v);
+      w = vec3.create();
+      vec3.cross(viewVector, this.up, w);
+      fov = this.fov * Math.PI / 180.0;
+      ar = gl.viewportWidth / gl.viewportHeight;
+      Hnear = 2 * Math.tan(fov / 2.0) * this.near;
+      Wnear = Hnear * ar;
+      Hfar = 2 * Math.tan(fov / 2.0) * this.far;
+      Wfar = Hfar * ar;
+      Cnear = vec3.create();
+      Cfar = vec3.create();
+      vec3.add(this.position, v, Cnear);
+      vec3.scale(Cnear, this.near);
+      vec3.add(this.position, v, Cfar);
+      return vec3.scale(Cfar, this.far);
     };
 
     Camera.prototype.getInverseProjectionMatrix = function() {

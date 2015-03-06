@@ -42,6 +42,8 @@
   
   varying vec2 vTexCoords;
   
+  uniform int DEBUG;
+  
   #define PI 3.1415926535897932384626433832795
   
   
@@ -54,7 +56,7 @@
   
   
   
-  vec3 reconstructPosition( float p_depth, vec2 p_ndc ) {
+  vec3 reconstructViewSpacePosition( float p_depth, vec2 p_ndc ) {
   	//p_ndc = p_ndc * 2.0 - 1.0;
   	//float depth = p_depth * 2.0 - 1.0;
   	//float viewDepth = projectionParams.w / (depth - projectionParams.z);
@@ -110,36 +112,56 @@
   	
   	
     vec4 depthSample = texture2D(depthTexture, vTexCoords);
+    
+    if (DEBUG == 1) {
+    	gl_FragColor = vec4(depthSample.xyz, 1.0);
+    	return;
+    }
+    
+    
     vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    //vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
     
-    vec3 matColor = vec3(0.5, 0.26, 0.24);
+    if (DEBUG == 2) {
+    	gl_FragColor = normalsSample;
+    	return;
+    }
     
-    //vec3 matColor = vec3(0.3, 0.21, 0.24);
-    matColor = pow ( matColor, vec3(2.2));
+    vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
+    //matColor = pow ( matColor, vec3(1.8));
     
-    vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
-    
-    gl_FragColor = decodedNormal;
-    //return;
-    
+    if (DEBUG == 3) {
+    	gl_FragColor = vec4(matColor, 1.0);
+    	return;
+    }
     
     float decodedDepth = decodeDepth(depthSample);
     
-    vec3 worldPosition = reconstructPosition( decodedDepth, vTexCoords );
-    
-    vec3 eyeDirection = normalize(-worldPosition);
-    
-    
-    
-    gl_FragColor = vec4(worldPosition, 1.0);
-    //return;
+    if (DEBUG == 4) {
+    	gl_FragColor = vec4(decodedDepth, decodedDepth, decodedDepth, 1.0);
+    	return;
+    }
     
     
-    vec4 d = vec4(decodedDepth, decodedDepth,decodedDepth, 1.0);
+    vec4 decodedNormal = vec4(decodeNormal(  normalsSample.xy ), 1.0);
     
-    gl_FragColor = d;
-    //return;
+    if (DEBUG == 5) {
+    	gl_FragColor = decodedNormal;
+    	return;
+    }
+    
+    
+    vec3 viewPosition = reconstructViewSpacePosition( decodedDepth, vTexCoords );
+    
+    if (DEBUG == 6) {
+    	gl_FragColor = vec4(viewPosition * 10.0, 1.0);
+    	return;
+    }
+    
+    
+    vec3 worldPosition = viewPosition;
+    
+    vec3 eyeDirection = normalize(-viewPosition);
+    
     
     vec3 sunDir = normalize(vec3(-0.5,1.0, 0.0));
     
@@ -148,9 +170,9 @@
     
     vec3 reflectionDirection = reflect(-sunDir, decodedNormal.xyz);
     
-    float specVal = pow(max(dot(reflectionDirection, eyeDirection), 0.0), specularExponent);
+    //float specVal = pow(max(dot(reflectionDirection, eyeDirection), 0.0), specularExponent);
     
-    //float specVal = pow( clamp( dot(N, H), 0.0, 1.0 ), 20.0 );
+    float specVal = pow( clamp( dot(N, H), 0.0, 1.0 ), 20.0 );
     
     float base = 1.0 - dot(eyeDirection, H);
     float exponential = pow(base, 5.0);
@@ -275,7 +297,7 @@
   void main (void) {
   	vec3 tNormal = vNormal * 0.5 + 0.5;
   	vec3 PN = perturb_normal( tNormal, vEyeDirection, vTexCoords );
-  	vec4 n = encodeNormal( tNormal );
+  	vec4 n = encodeNormal( PN );
   	
   	//vec4 n = encodeNormal( vNormal );
   	
@@ -416,6 +438,8 @@
 	var rTri = 0;
 	var rSquare = 0;
 	
+	var DEBUG_VIEW = 0;
+	
 	
 	function defaultRenderSettings () {
 		gl.clearColor( 0.0, 0.0, 0.0, 0.0);
@@ -554,6 +578,8 @@
         
         gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
         
+        gl.uniform1i(quad.material.getUniform('DEBUG'), DEBUG_VIEW);
+        
         gl.drawArrays(gl.TRIANGLES, 0, quad.vertexBuffer.numItems);
         
         quad.release();
@@ -636,14 +662,14 @@
 		teapot.material.setNormalMap('textures/normals.png');
 		teapot.material.showInfo();
 		teapot.setPosition( [0.0, 0.0, 0.0]);
-		teapot.setScale([0.7, 0.7, 0.7]); 
+		teapot.setScale([1.0, 1.0, 1.0]); 
 		
 		quad = new DFIR.FullscreenQuad();
 		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
 		quad.material.showInfo();
 		
-		camera = new DFIR.Camera()
-		camera.setPosition([ 0.0, 1.0, 20.0 ]); 
+		camera = new DFIR.Camera();
+		camera.setPosition([ 0.0, 1.0, 10.0 ]); 
 		
 	}
 
@@ -666,6 +692,10 @@
         tick();
     }
 
+	function onSelectChange(value) {
+		DEBUG_VIEW = value;
+	}
+
 
 </script>
 
@@ -678,6 +708,16 @@
     <canvas id="canvas" style="border: none;" width="512" height="512"></canvas>
 
 
+	<select id="debug_view" style="position:absolute;top:10px;left:10px;" onchange="onSelectChange(this.value);">
+		<option value="0">Full Render</option>
+		<option value="1">Compressed Depth ( Alpha amplified )</option>
+		<option value="2">Compressed Normal</option>
+		<option value="3">Albedo</option>
+		<option value="4">Decoded Depth Buffer</option>
+		<option value="5">Decoded Normals</option>
+		<option value="6">Decoded View Position (x 10)</option>
+	</select>
+    
     
     <!-- build:remove:dist -->
     <script src="//localhost:35729/livereload.js"></script>
