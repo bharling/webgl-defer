@@ -515,7 +515,7 @@
         var radius = 40.0;
         
         
-        camera.setPosition([ radius * Math.sin(angle), 15.0, radius * Math.cos(angle) ]);
+        camera.setPosition([ radius * Math.sin(angle), 27.0 * Math.sin(angle*0.5), radius * Math.cos(angle) ]);
         camera.updateViewMatrix();
         camera.updateProjectionMatrix();
         
