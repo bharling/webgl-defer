@@ -15,8 +15,13 @@ class DFIR.Object3D
     @worldTransform
       
   updateWorldTransform: (parentTransform) ->
+    # reset ( should include parent here)
     mat4.identity @worldTransform
+    
+    # move
     mat4.translate @worldTransform, @position
+    #rotate
+    #scale
     mat4.scale @worldTransform, @scale
     @transformDirty = false
     return
