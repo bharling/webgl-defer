@@ -2,14 +2,16 @@ module.exports = (grunt) ->
   
   coffeeFiles = [ 
   
-    'src/coffee/intro.coffee', 
+    'src/coffee/intro.coffee',
+    'src/coffee/math.coffee',
     'src/coffee/buffer.coffee' , 
     'src/coffee/object.coffee', 
     'src/coffee/json_model.coffee' , 
     'src/coffee/shader.coffee',
     'src/coffee/camera.coffee', 
     'src/coffee/Gbuffer.coffee', 
-    'src/coffee/fullscreenQuad.coffee' ]
+    'src/coffee/fullscreenQuad.coffee',
+    'src/coffee/debug_view.coffee']
   
   
   

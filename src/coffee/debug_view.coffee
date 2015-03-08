@@ -37,11 +37,19 @@ class DebugView
     @quads[i].release()
     
   createMaterial: ->
-    @material = new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" )
+    @material = new DFIR.Shader "fs_quad_vert" , "fs_quad_frag"
     @debug_uniform_location = @material.getUniform('DEBUG')
     
   createQuads: (num) ->
-    scale = 0.2
+    tiles = Math.ceil(Math.sqrt(num))
+    
+    tileWidth = gl.viewportWidth / tiles
+    tileHeight = gl.viewportHeight / tiles
+    
+    x = 0
+    y = 0
+    
+    
     @quads = []
     #for i in [0 .. num]
     

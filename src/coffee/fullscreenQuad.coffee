@@ -23,12 +23,13 @@ fs_quad_fragment_shader = """
 """
 
 
+  
+  
 
 
-
-
-class DFIR.FullscreenQuad
+class DFIR.FullscreenQuad extends DFIR.Object3D
   constructor: ->
+    super()
     @vertices = [
       -1.0, -1.0,
        1.0, -1.0,

@@ -1,3 +1,8 @@
+class DFIR.Object2D
+  
+
+
+
 class DFIR.Object3D
   constructor: ->
     @position = vec3.create()

@@ -1,5 +1,5 @@
 (function() {
-  var buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, shader_type_enums,
+  var DebugView, buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -7,6 +7,91 @@
   exports = typeof exports !== 'undefined' ? exports : window;
 
   exports.DFIR = {};
+
+  mat3.makeTranslation = function(tx, ty) {
+    var tm;
+    tm = mat3.create();
+    mat3.identity(tm);
+    tm[6] = tx;
+    tm[7] = ty;
+    return tm;
+  };
+
+  mat3.makeRotation = function(radians) {
+    var c, rm, s;
+    c = Math.cos(radians);
+    s = Math.sin(radians);
+    rm = mat3.create();
+    rm.identity();
+    rm[0] = c;
+    rm[1] = -s;
+    rm[2] = 0;
+    rm[3] = s;
+    rm[4] = c;
+    rm[5] = 0;
+    rm[6] = 0;
+    rm[7] = 0;
+    rm[8] = 1;
+    return rm;
+  };
+
+  mat3.makeProjection = function(w, h) {
+    var pm;
+    pm = mat3.create();
+    mat3.identity(pm);
+    pm[0] = 2.0 / w;
+    pm[1] = 0;
+    pm[2] = 0;
+    pm[3] = 0;
+    pm[4] = -2.0 / h;
+    pm[5] = 0;
+    pm[6] = -1;
+    pm[7] = 1;
+    pm[8] = 1;
+    return pm;
+  };
+
+  mat3.makeScale = function(sx, sy) {
+    var sm;
+    sm = mat3.create();
+    mat3.identity(sm);
+    sm[0] = sx;
+    sm[4] = sy;
+    return sm;
+  };
+
+  mat3.multiply = function(a, b) {
+    var a00, a01, a02, a10, a11, a12, a20, a21, a22, b00, b01, b02, b10, b11, b12, b20, b21, b22, ret;
+    a00 = a[0 * 3 + 0];
+    a01 = a[0 * 3 + 1];
+    a02 = a[0 * 3 + 2];
+    a10 = a[1 * 3 + 0];
+    a11 = a[1 * 3 + 1];
+    a12 = a[1 * 3 + 2];
+    a20 = a[2 * 3 + 0];
+    a21 = a[2 * 3 + 1];
+    a22 = a[2 * 3 + 2];
+    b00 = b[0 * 3 + 0];
+    b01 = b[0 * 3 + 1];
+    b02 = b[0 * 3 + 2];
+    b10 = b[1 * 3 + 0];
+    b11 = b[1 * 3 + 1];
+    b12 = b[1 * 3 + 2];
+    b20 = b[2 * 3 + 0];
+    b21 = b[2 * 3 + 1];
+    b22 = b[2 * 3 + 2];
+    ret = mat3.create();
+    ret[0] = a00 * b00 + a01 * b10 + a02 * b20;
+    ret[1] = a00 * b01 + a01 * b11 + a02 * b21;
+    ret[2] = a00 * b02 + a01 * b12 + a02 * b22;
+    ret[3] = a10 * b00 + a11 * b10 + a12 * b20;
+    ret[4] = a10 * b01 + a11 * b11 + a12 * b21;
+    ret[5] = a10 * b02 + a11 * b12 + a12 * b22;
+    ret[6] = a20 * b00 + a21 * b10 + a22 * b20;
+    ret[7] = a20 * b01 + a21 * b11 + a22 * b21;
+    ret[8] = a20 * b02 + a21 * b12 + a22 * b22;
+    return ret;
+  };
 
   DFIR.Buffer = (function() {
     function Buffer(data, itemSize, mode, type) {
@@ -33,6 +118,13 @@
     };
 
     return Buffer;
+
+  })();
+
+  DFIR.Object2D = (function() {
+    function Object2D() {}
+
+    return Object2D;
 
   })();
 
@@ -597,8 +689,11 @@
 
   fs_quad_fragment_shader = "varying vec2 vTexCoords;\n\nvoid main (void) {\n  gl_FragColor = vec4(vTexCoords, 1.0, 1.0);\n}\n";
 
-  DFIR.FullscreenQuad = (function() {
+  DFIR.FullscreenQuad = (function(superClass) {
+    extend(FullscreenQuad, superClass);
+
     function FullscreenQuad() {
+      FullscreenQuad.__super__.constructor.call(this);
       this.vertices = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0];
       this.textureCoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
       this.vertexBuffer = new DFIR.Buffer(new Float32Array(this.vertices), 2, gl.STATIC_DRAW);
@@ -623,6 +718,67 @@
     };
 
     return FullscreenQuad;
+
+  })(DFIR.Object3D);
+
+  DebugView = (function() {
+    function DebugView(gbuffer, num_views) {
+      this.gbuffer = gbuffer;
+      if (num_views == null) {
+        num_views = 6;
+      }
+      this.depthTex = this.gbuffer.getDepthTextureUnit();
+      this.normalsTex = this.guffer.getNormalsTexture();
+      this.albedoTex = this.gbuffer.getAlbedoTextureUnit();
+      this.createMaterial();
+      this.createQuads(num_views);
+    }
+
+    DebugView.prototype.draw = function(camera) {
+      var i, j, ref, results;
+      this.material.use();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getNormalsTextureUnit());
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getAlbedoTextureUnit());
+      gl.uniform1i(this.material.getUniform('depthTexture'), 0);
+      gl.uniform1i(this.material.getUniform('normalsTexture'), 1);
+      gl.uniform1i(this.material.getUniform('albedoTexture'), 2);
+      gl.uniformMatrix4fv(this.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
+      results = [];
+      for (i = j = 0, ref = this.quads.length; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+        results.push(this.drawQuad(i));
+      }
+      return results;
+    };
+
+    DebugView.prototype.drawQuad = function(index) {
+      this.quads[i].bind();
+      gl.uniform1i(this.material.getUniform('DEBUG'), index);
+      gl.drawArrays(gl.TRIANGLES, 0, this.quads[i].vertexBuffer.numItems);
+      return this.quads[i].release();
+    };
+
+    DebugView.prototype.createMaterial = function() {
+      this.material = new DFIR.Shader("fs_quad_vert", "fs_quad_frag");
+      return this.debug_uniform_location = this.material.getUniform('DEBUG');
+    };
+
+    DebugView.prototype.createQuads = function(num) {
+      var tileHeight, tileWidth, tiles, x, y;
+      tiles = Math.ceil(Math.sqrt(num));
+      tileWidth = gl.viewportWidth / tiles;
+      tileHeight = gl.viewportHeight / tiles;
+      x = 0;
+      y = 0;
+      return this.quads = [];
+    };
+
+    DebugView.prototype.createQuad = function(x, y, w, h) {};
+
+    return DebugView;
 
   })();
 
