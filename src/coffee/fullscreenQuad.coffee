@@ -23,7 +23,95 @@ fs_quad_fragment_shader = """
 """
 
 
-  
+class DFIR.DebugGridView
+  constructor: (num_levels) ->
+    @build_geometry num_levels
+    
+    
+  build_geometry: (num_levels) ->
+    x = -1.0
+    y = -1.0
+    
+    
+    ht = 2.0 / num_levels
+    
+    
+    
+    wd = 0.5
+    
+    @vertices = []
+    @textureCoords = []
+    @indices = []
+    
+    f = 0
+    
+    for current_level in [0 .. num_levels]
+         
+      verts = [
+        x, y, current_level,
+        x + wd, y, current_level,
+        x, y + ht, current_level,
+
+        x, y + ht, current_level,
+        x + wd, y, current_level, 
+        x + wd, y + ht, current_level
+        
+      ]
+      
+      texcoords = [
+        0.0, 0.0,
+        1.0, 0.0,
+        0.0, 1.0,
+        
+        0.0, 1.0, 
+        1.0, 0.0,
+        1.0, 1.0
+      ]
+      
+      indices = [
+        f, f+1, f+2,
+        f+3, f+4, f+5
+      ]
+      
+      f += 6
+      
+      y = y + ht
+      
+      
+      
+      @vertices = @vertices.concat verts
+      @textureCoords = @textureCoords.concat texcoords
+      @indices = @indices.concat indices
+      
+
+      
+    console.log @vertices
+    
+    
+    @vertexBuffer = new DFIR.Buffer new Float32Array(@vertices), 3, gl.STATIC_DRAW
+    @textureBuffer = new DFIR.Buffer new Float32Array(@textureCoords), 2, gl.STATIC_DRAW
+    @indexBuffer = new DFIR.Buffer( new Uint16Array( @indices ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
+    
+    console.log @vertexBuffer.numItems
+    
+  bind: (material) ->
+    
+    #console.log material
+    gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer.get()
+    gl.enableVertexAttribArray material.getAttribute('aVertexPosition')
+    gl.vertexAttribPointer material.getAttribute( 'aVertexPosition'), 3, gl.FLOAT, false, 0, 0
+    
+    gl.bindBuffer gl.ARRAY_BUFFER, @textureBuffer.get()
+    gl.enableVertexAttribArray material.getAttribute('aVertexTextureCoords')
+    gl.vertexAttribPointer material.getAttribute( 'aVertexTextureCoords'), 2, gl.FLOAT, false, 0, 0
+    
+  draw: ->
+    gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer.get()
+    gl.drawElements gl.TRIANGLES, @indexBuffer.numItems, gl.UNSIGNED_SHORT, 0
+    
+  release: ->
+    gl.bindBuffer gl.ARRAY_BUFFER, null
+    
   
 
 

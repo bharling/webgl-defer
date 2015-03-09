@@ -78,4 +78,17 @@ mat3.multiply = (a,b) ->
   ret[8] = a20 * b02 + a21 * b12 + a22 * b22
   ret
 
+
+# some simple stuff that I should replace later
+
+pixelsToClip = ( pos ) ->
+  px = pos[0] / gl.viewportWidth
+  py = pos[1] / gl.viewportHeight
+  px = px * 2.0
+  py = py * 2.0
+  px -= 1.0
+  py -= 1.0
+  py *= -1.0
+  return [px,py]
+  
   

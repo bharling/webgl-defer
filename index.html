@@ -17,6 +17,31 @@
 	
 </style>
 
+<script id="debug_grid_vert" type="x-shader/x-vertex">
+	attribute vec3 aVertexPosition;
+	attribute vec2 aVertexTextureCoords;
+	
+	varying vec2 vTexCoords;
+	
+	void main (void) {
+		gl_Position = vec4(aVertexPosition, 1.0);
+		vTexCoords = aVertexTextureCoords;
+	}
+</script>
+
+<script id="debug_grid_frag" type="x-shader/x-fragment">
+	precision highp float;
+	
+	varying vec2 vTexCoords;
+	
+	void main (void) {
+		gl_FragColor = vec4(vTexCoords.xy, 1.0, 1.0);
+	}
+	
+</script>
+
+
+
 <script id="fs_quad_vert" type="x-shader/x-vertex">
   attribute vec2 aVertexPosition;
   attribute vec2 aVertexTextureCoords;
@@ -590,6 +615,12 @@
         
         quad.release();
         
+        //gl.disable( gl.CULL_FACE );
+        debug_material.use();
+        debug_grid.bind(debug_material);
+        debug_grid.draw();
+        debug_grid.release();
+        
         
         // tell gl we want to use the triangle vertex position buffer
         // gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
@@ -659,7 +690,7 @@
 		animate();
 	}
 
-	var teapot, quad, camera;
+	var teapot, quad, camera, debug_grid, debug_material;
 
 	function loadModel () {
 		teapot = new DFIR.JSONGeometry('models/teapot.json');
@@ -673,6 +704,11 @@
 		quad = new DFIR.FullscreenQuad();
 		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
 		quad.material.showInfo();
+		
+		
+		debug_grid = new DFIR.DebugGridView(4);
+		debug_material = new DFIR.Shader ( "debug_grid_vert", "debug_grid_frag" );
+		
 		
 		camera = new DFIR.Camera();
 		camera.setPosition([ 0.0, 1.0, 10.0 ]); 

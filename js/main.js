@@ -1,5 +1,5 @@
 (function() {
-  var DebugView, buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, shader_type_enums,
+  var DebugView, buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, pixelsToClip, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -91,6 +91,18 @@
     ret[7] = a20 * b01 + a21 * b11 + a22 * b21;
     ret[8] = a20 * b02 + a21 * b12 + a22 * b22;
     return ret;
+  };
+
+  pixelsToClip = function(pos) {
+    var px, py;
+    px = pos[0] / gl.viewportWidth;
+    py = pos[1] / gl.viewportHeight;
+    px = px * 2.0;
+    py = py * 2.0;
+    px -= 1.0;
+    py -= 1.0;
+    py *= -1.0;
+    return [px, py];
   };
 
   DFIR.Buffer = (function() {
@@ -688,6 +700,60 @@
   fs_quad_vertex_shader = "attribute vec3 aVertexPosition;\nattribute vec2 aVertexTextureCoords;\n\nvarying vec2 vTexCoords;\n\nvoid main( void ) {\n  // passthru\n  gl_Position = vec4(aVertexPosition, 1.0);\n  \n  vTexCoords = aVertexTextureCoords;\n}\n";
 
   fs_quad_fragment_shader = "varying vec2 vTexCoords;\n\nvoid main (void) {\n  gl_FragColor = vec4(vTexCoords, 1.0, 1.0);\n}\n";
+
+  DFIR.DebugGridView = (function() {
+    function DebugGridView(num_levels) {
+      this.build_geometry(num_levels);
+    }
+
+    DebugGridView.prototype.build_geometry = function(num_levels) {
+      var current_level, f, ht, indices, j, ref, texcoords, verts, wd, x, y;
+      x = -1.0;
+      y = -1.0;
+      ht = 2.0 / num_levels;
+      wd = 0.5;
+      this.vertices = [];
+      this.textureCoords = [];
+      this.indices = [];
+      f = 0;
+      for (current_level = j = 0, ref = num_levels; 0 <= ref ? j <= ref : j >= ref; current_level = 0 <= ref ? ++j : --j) {
+        verts = [x, y, current_level, x + wd, y, current_level, x, y + ht, current_level, x, y + ht, current_level, x + wd, y, current_level, x + wd, y + ht, current_level];
+        texcoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
+        indices = [f, f + 1, f + 2, f + 3, f + 4, f + 5];
+        f += 6;
+        y = y + ht;
+        this.vertices = this.vertices.concat(verts);
+        this.textureCoords = this.textureCoords.concat(texcoords);
+        this.indices = this.indices.concat(indices);
+      }
+      console.log(this.vertices);
+      this.vertexBuffer = new DFIR.Buffer(new Float32Array(this.vertices), 3, gl.STATIC_DRAW);
+      this.textureBuffer = new DFIR.Buffer(new Float32Array(this.textureCoords), 2, gl.STATIC_DRAW);
+      this.indexBuffer = new DFIR.Buffer(new Uint16Array(this.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
+      return console.log(this.vertexBuffer.numItems);
+    };
+
+    DebugGridView.prototype.bind = function(material) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer.get());
+      gl.enableVertexAttribArray(material.getAttribute('aVertexPosition'));
+      gl.vertexAttribPointer(material.getAttribute('aVertexPosition'), 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.textureBuffer.get());
+      gl.enableVertexAttribArray(material.getAttribute('aVertexTextureCoords'));
+      return gl.vertexAttribPointer(material.getAttribute('aVertexTextureCoords'), 2, gl.FLOAT, false, 0, 0);
+    };
+
+    DebugGridView.prototype.draw = function() {
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer.get());
+      return gl.drawElements(gl.TRIANGLES, this.indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+    };
+
+    DebugGridView.prototype.release = function() {
+      return gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    };
+
+    return DebugGridView;
+
+  })();
 
   DFIR.FullscreenQuad = (function(superClass) {
     extend(FullscreenQuad, superClass);
