@@ -45,37 +45,33 @@ class DFIR.DebugGridView
     
     f = 0
     
-    for current_level in [0 .. num_levels]
-         
+    for current_level in [1 .. num_levels]
+      
+      console.log current_level
+      
       verts = [
         x, y, current_level,
-        x + wd, y, current_level,
-        x, y + ht, current_level,
-
-        x, y + ht, current_level,
-        x + wd, y, current_level, 
-        x + wd, y + ht, current_level
-        
+        x+ht, y, current_level,
+        x+ht, y+ht, current_level,
+        x, y+ht, current_level
       ]
+      
       
       texcoords = [
         0.0, 0.0,
         1.0, 0.0,
-        0.0, 1.0,
-        
-        0.0, 1.0, 
-        1.0, 0.0,
-        1.0, 1.0
+        1.0, 1.0,
+        0.0, 1.0
       ]
       
       indices = [
         f, f+1, f+2,
-        f+3, f+4, f+5
+        f+2, f+3, f
       ]
       
-      f += 6
+      f += 4
       
-      y = y + ht
+      x = x + ht
       
       
       
@@ -85,14 +81,14 @@ class DFIR.DebugGridView
       
 
       
-    console.log @vertices
     
     
     @vertexBuffer = new DFIR.Buffer new Float32Array(@vertices), 3, gl.STATIC_DRAW
     @textureBuffer = new DFIR.Buffer new Float32Array(@textureCoords), 2, gl.STATIC_DRAW
     @indexBuffer = new DFIR.Buffer( new Uint16Array( @indices ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
-    
-    console.log @vertexBuffer.numItems
+    console.log @indices
+    console.log @vertices
+
     
   bind: (material) ->
     

@@ -716,21 +716,22 @@
       this.textureCoords = [];
       this.indices = [];
       f = 0;
-      for (current_level = j = 0, ref = num_levels; 0 <= ref ? j <= ref : j >= ref; current_level = 0 <= ref ? ++j : --j) {
-        verts = [x, y, current_level, x + wd, y, current_level, x, y + ht, current_level, x, y + ht, current_level, x + wd, y, current_level, x + wd, y + ht, current_level];
-        texcoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
-        indices = [f, f + 1, f + 2, f + 3, f + 4, f + 5];
-        f += 6;
-        y = y + ht;
+      for (current_level = j = 1, ref = num_levels; 1 <= ref ? j <= ref : j >= ref; current_level = 1 <= ref ? ++j : --j) {
+        console.log(current_level);
+        verts = [x, y, current_level, x + ht, y, current_level, x + ht, y + ht, current_level, x, y + ht, current_level];
+        texcoords = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
+        indices = [f, f + 1, f + 2, f + 2, f + 3, f];
+        f += 4;
+        x = x + ht;
         this.vertices = this.vertices.concat(verts);
         this.textureCoords = this.textureCoords.concat(texcoords);
         this.indices = this.indices.concat(indices);
       }
-      console.log(this.vertices);
       this.vertexBuffer = new DFIR.Buffer(new Float32Array(this.vertices), 3, gl.STATIC_DRAW);
       this.textureBuffer = new DFIR.Buffer(new Float32Array(this.textureCoords), 2, gl.STATIC_DRAW);
       this.indexBuffer = new DFIR.Buffer(new Uint16Array(this.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
-      return console.log(this.vertexBuffer.numItems);
+      console.log(this.indices);
+      return console.log(this.vertices);
     };
 
     DebugGridView.prototype.bind = function(material) {
