@@ -631,11 +631,12 @@
 
     Gbuffer.prototype.createFrameBuffer = function() {
       this.ext = gl.getExtension('WEBGL_draw_buffers');
+      this.half_ext = gl.getExtension("OES_texture_half_float");
       this.DepthEXT = gl.getExtension("WEBKIT_WEBGL_depth_texture") || gl.getExtension("WEBGL_depth_texture");
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
       this.albedoTextureUnit = this.createTexture();
-      this.normalsTextureUnit = this.createTexture();
+      this.normalsTextureUnit = this.createTexture(half_ext.HALF_FLOAT_OES);
       this.depthTextureUnit = this.createTexture();
       this.depthComponent = this.createDepthTexture();
       gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
@@ -660,15 +661,16 @@
       return tex;
     };
 
-    Gbuffer.prototype.createTexture = function() {
+    Gbuffer.prototype.createTexture = function(format) {
       var tex;
+      format = this.half_ext.HALF_FLOAT_OES;
       tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, format, null);
       return tex;
     };
 

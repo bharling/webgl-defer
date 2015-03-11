@@ -69,7 +69,7 @@ class DFIR.Gbuffer
   createFrameBuffer: ->
     @ext = gl.getExtension 'WEBGL_draw_buffers'
     
-    
+    @half_ext = gl.getExtension("OES_texture_half_float")
     
     @DepthEXT = gl.getExtension( "WEBKIT_WEBGL_depth_texture" ) or gl.getExtension( "WEBGL_depth_texture" )
     
@@ -79,7 +79,7 @@ class DFIR.Gbuffer
     
     # create Texture Units
     @albedoTextureUnit = @createTexture()
-    @normalsTextureUnit = @createTexture()
+    @normalsTextureUnit = @createTexture(half_ext.HALF_FLOAT_OES)
     @depthTextureUnit = @createTexture()
     @depthComponent = @createDepthTexture()
     
@@ -121,14 +121,15 @@ class DFIR.Gbuffer
     tex
 
 
-  createTexture: ->
+  createTexture: (format) ->
+    format = @half_ext.HALF_FLOAT_OES
     tex = gl.createTexture()
     gl.bindTexture gl.TEXTURE_2D, tex
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @width, @height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @width, @height, 0, gl.RGBA, format, null)
     tex
 
   bind: ->
