@@ -610,7 +610,7 @@
       var aspect;
       mat4.identity(this.projectionMatrix);
       aspect = gl.viewportWidth / gl.viewportHeight;
-      return mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, this.projectionMatrix);
+      return mat4.perspective(this.fov, gl.viewportWidth / gl.viewportHeight, this.near, this.far, this.projectionMatrix);
     };
 
     return Camera;

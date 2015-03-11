@@ -197,7 +197,7 @@
     vec3 viewPosition = reconstructViewSpacePosition( decodedDepth, vTexCoords );
     
     if (DEBUG == 6.0) {
-    	gl_FragColor = vec4((viewPosition * 10.0), 1.0);
+    	gl_FragColor = vec4((viewPosition), 1.0);
     	return;
     }
     
@@ -362,7 +362,7 @@
   	
     gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
     gl_FragData[1] = n;
-    gl_FragData[2] = pack(-depthClipSpace.x / farClip);
+    gl_FragData[2] = pack(-depthClipSpace.x / depthClipSpace.y);
   }
 </script>
 
@@ -585,10 +585,51 @@
         mat4.toInverseMat3(worldMatrix, normalMatrix);
         mat3.transpose(normalMatrix);
         
+        var projectionMatrix = camera.getProjectionMatrix();
+        
+        for ( var i=0; i < pots.length; i ++ ) {
+        	var pot = pots[i];
+        	
+        	if (pot.bind()) { 
+        		pot.material.use()
+	        	var worldMatrix = pot.getWorldTransform();
+	        	var worldViewMatrix = mat4.create(), normalMatrix = mat3.create();
+	        	mat4.multiply( viewMatrix, worldMatrix, worldViewMatrix );
+	        	
+	        	mat4.toInverseMat3(worldMatrix, normalMatrix);
+	        	mat3.transpose(normalMatrix);
+	        	
+	        	pot.setMatrixUniforms(worldViewMatrix, projectionMatrix);
+	        	
+	        	gl.uniformMatrix3fv(pot.material.getUniform('uNormalMatrix'), false, normalMatrix);
+        		gl.uniformMatrix4fv(pot.material.getUniform('uViewMatrix'), false, viewMatrix);
+        	
+        		pot.setFloatUniform('farClip', camera.far);
+        	
+        	
+	        	// bind textures
+	        	gl.activeTexture(gl.TEXTURE0);
+	        	gl.bindTexture(gl.TEXTURE_2D, pot.material.diffuseMap);
+	        	gl.uniform1i(pot.material.getUniform('diffuseTex'), 0);
+	        	
+	        	
+	        	gl.activeTexture(gl.TEXTURE1);
+	        	gl.bindTexture(gl.TEXTURE_2D, pot.material.normalMap);
+	        	gl.uniform1i(pot.material.getUniform('normalTex'), 1);
+        	
+        	
+        		teapot.draw();
+        	
+        	}
+        	
+        	
+        	
+        	
+        
+        }
         
         
-        
-        if (teapot.bind() ) {
+        /* if (teapot.bind() ) {
         	teapot.material.use();
         	teapot.setMatrixUniforms(worldViewMatrix, camera.getProjectionMatrix());
         	
@@ -614,7 +655,7 @@
         	//teapot.release();
         	
         	
-        }
+        } */
         
         gbuffer.release();
         
@@ -739,15 +780,32 @@
 	}
 
 	var teapot, quad, camera, debug_grid, debug_material;
+	var pots = [];
+	
+	var pots_per_side = 10;
+	var pots_half = 25.0 * pots_per_side / 2;
 
 	function loadModel () {
+	
+		var mat = new DFIR.Shader( "gbuffer_vert", "gbuffer_frag" );
+		for ( var x = 0; x < pots_per_side; x++ )  {
+			for (var y =0; y < pots_per_side; y++) { 
+			   pot = new DFIR.JSONGeometry('models/teapot.json');
+			   pot.setMaterial(mat);
+			   pot.material.setDiffuseMap('textures/diffuse.jpg');
+			   pot.material.setNormalMap('textures/normals.png');
+			   pot.setPosition([-pots_half + (x * 25.0), 0.0, -pots_half + (y * 25.0) ]);
+			   pot.setScale([0.5,0.5,0.5]);
+			   pots.push(pot);
+			}
+		}
 		teapot = new DFIR.JSONGeometry('models/teapot.json');
 		teapot.setMaterial ( new DFIR.Shader( "gbuffer_vert", "gbuffer_frag" ) );
 		teapot.material.setDiffuseMap('textures/diffuse.jpg');
 		teapot.material.setNormalMap('textures/normals.png');
 		teapot.material.showInfo();
 		teapot.setPosition( [0.0, 0.0, 0.0]);
-		teapot.setScale([1.0, 1.0, 1.0]); 
+		teapot.setScale([0.5, 0.5, 0.5]); 
 		
 		quad = new DFIR.FullscreenQuad();
 		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
@@ -760,7 +818,7 @@
 		
 		camera = new DFIR.Camera();
 		camera.setPosition([ 0.0, 1.0, 10.0 ]);
-		camera.setFarClip(1000.0);
+		camera.setFarClip(600.0);
 		
 	}
 
