@@ -22,20 +22,87 @@ getShader = (id) ->
   if !gl.getShaderParameter(shader, gl.COMPILE_STATUS)
     console.log id, gl.getShaderInfoLog( shader )
     return null
-    
   return shader
   
   
-buildProgram = (vertexSourceId, fragmentSourceId) ->
-  fragmentShader = getShader fragmentSourceId
-  vertexShader = getShader vertexSourceId
+class DFIR.ShaderSource
+  constructor: (@vertexSource, @fragmentSource) ->
+
+
+class DFIR.ShaderLoader
+  constructor: (@vertUrl, @fragUrl, @callback) ->
+    
+    @fragmentLoaded = false
+    @vertexLoaded = false
+    
+    @result = new DFIR.ShaderSource()
+    
+    loadShaderAjax @vertUrl, @onVertexLoaded
+    loadShaderAjax @fragUrl, @onFragmentLoaded
+        
+  checkLoaded: ->
+    loaded = @fragmentLoaded and @vertexLoaded
+    return @fragmentLoaded and @vertexLoaded
+    
+  buildShader: ->
+    return buildShaderProgram( @result.vertexSource, @result.fragmentSource )
+    
+  onFragmentLoaded: (data) =>
+    fragShader = gl.createShader gl.FRAGMENT_SHADER
+    gl.shaderSource fragShader, data
+    gl.compileShader fragShader
+    @result.fragmentSource = fragShader
+    @fragmentLoaded = true
+    if @checkLoaded()
+      @callback @buildShader()
+
+    
+  onVertexLoaded: (data) =>
+    vertShader = gl.createShader gl.VERTEX_SHADER
+    gl.shaderSource vertShader, data
+    gl.compileShader vertShader
+    @result.vertexSource = vertShader
+    @vertexLoaded = true
+    if @checkLoaded()
+      @callback @buildShader()
+    
+  @load: (vertUrl, fragUrl, callback) ->
+    new ShaderLoader vertUrl, fragUrl, callback
   
+
+loadResource = (url, callback) ->
+    
+
+  
+loadShaderAjax = (url, callback) ->
+  request = new XMLHttpRequest()
+  request.open 'GET', url
+  
+  request.onreadystatechange = () ->
+    if request.readyState is 4
+      callback request.responseText
+  request.send()
+  
+  
+buildShaderProgram = (vertexShader, fragmentShader) ->
   shaderProgram = gl.createProgram()
   gl.attachShader shaderProgram, vertexShader
   gl.attachShader shaderProgram, fragmentShader
   gl.linkProgram shaderProgram
-  
   shaderProgram
+  
+buildProgram = (vertexSourceId, fragmentSourceId) ->
+  fragmentShader = getShader fragmentSourceId
+  vertexShader = getShader vertexSourceId
+  return buildProgramFromStrings vertexShader, fragmentShader
+  
+buildProgramFromStrings = (vertexSource, fragmentSource) ->
+  shaderProgram = gl.createProgram()
+  gl.attachShader shaderProgram, vertexSource
+  gl.attachShader shaderProgram, fragmentSource
+  gl.linkProgram shaderProgram
+  shaderProgram
+
   
   
 shader_type_enums =
@@ -113,9 +180,7 @@ class DFIR.TextureMapTypes
   
 
 class DFIR.Shader
-  constructor: (vertSourceId, fragSourceId) ->
-    @name = vertSourceId
-    @program = buildProgram vertSourceId, fragSourceId
+  constructor: (@program) ->
     @params = getShaderParams @program
     @diffuseMapLoaded = @normalMapLoaded = false
     @buildUniforms()

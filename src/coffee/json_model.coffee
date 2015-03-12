@@ -1,7 +1,6 @@
 loadJSON = (url, callback) ->
   request = new XMLHttpRequest()
   request.open 'GET', url
-  console.log "Loading json: #{url}"
   
   request.onreadystatechange = () ->
     if request.readyState is 4

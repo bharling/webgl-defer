@@ -1,6 +1,11 @@
 class DFIR.Camera extends DFIR.Object3D
-  constructor: () ->
+  constructor: (@viewportWidth, @viewportHeight) ->
     super()
+    
+    
+    @viewportWidth ?= gl.viewportWidth
+    @viewportHeight ?= gl.viewportHeight
+    
     @target = vec3.create()
     @fov = 45.0
     @up = vec3.create [0.0, 1.0, 0.0]
@@ -31,7 +36,7 @@ class DFIR.Camera extends DFIR.Object3D
     w = vec3.create()
     vec3.cross viewVector, @up, w
     fov = @fov * Math.PI / 180.0
-    ar = gl.viewportWidth / gl.viewportHeight
+    ar = @viewportWidth / @viewportHeight
     
     Hnear = 2 * Math.tan(fov / 2.0) * @near
     Wnear = Hnear * ar
@@ -77,8 +82,8 @@ class DFIR.Camera extends DFIR.Object3D
     
   updateProjectionMatrix: () ->
     mat4.identity @projectionMatrix
-    aspect = gl.viewportWidth / gl.viewportHeight
-    mat4.perspective @fov, gl.viewportWidth / gl.viewportHeight, @near, @far, @projectionMatrix
+    aspect = @viewportWidth / @viewportHeight
+    mat4.perspective @fov, @viewportWidth / @viewportHeight, @near, @far, @projectionMatrix
     
     
   

@@ -47,7 +47,6 @@ class DFIR.DebugGridView
     
     for current_level in [1 .. num_levels]
       
-      console.log current_level
       
       verts = [
         x, y, current_level,
@@ -86,8 +85,6 @@ class DFIR.DebugGridView
     @vertexBuffer = new DFIR.Buffer new Float32Array(@vertices), 3, gl.STATIC_DRAW
     @textureBuffer = new DFIR.Buffer new Float32Array(@textureCoords), 2, gl.STATIC_DRAW
     @indexBuffer = new DFIR.Buffer( new Uint16Array( @indices ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
-    console.log @indices
-    console.log @vertices
 
     
   bind: (material) ->

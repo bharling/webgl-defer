@@ -7,6 +7,7 @@ class DFIR.Object3D
   constructor: ->
     @position = vec3.create()
     @scale = vec3.create()
+    @scale[0] = @scale[1] = @scale[2] = 1.0;
     #@rotationQuaternion = quat.create()
     @transformDirty = true
     @worldTransform = mat4.create()
@@ -16,7 +17,6 @@ class DFIR.Object3D
   getWorldTransform: () ->
     if @transformDirty is true
       @updateWorldTransform()
-      console.log @, @worldTransform
     @worldTransform
       
   updateWorldTransform: (parentTransform) ->

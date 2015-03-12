@@ -17,365 +17,6 @@
 	
 </style>
 
-<script id="debug_grid_vert" type="x-shader/x-vertex">
-	attribute vec3 aVertexPosition;
-	attribute vec2 aVertexTextureCoords;
-	
-	varying vec2 vTexCoords;
-	varying float debug;
-	
-	void main (void) {
-		gl_Position = vec4(aVertexPosition.xy, 0.0, 1.0);
-		debug = aVertexPosition.z;
-		vTexCoords = aVertexTextureCoords;
-	}
-</script>
-
-<script id="debug_grid_frag" type="x-shader/x-fragment">
-	precision highp float;
-	
-	varying vec2 vTexCoords;
-	varying float debug;
-	
-	void main (void) {
-		gl_FragColor = vec4(vTexCoords.xy, 1.0, 1.0);
-	}
-	
-</script>
-
-
-
-<script id="fs_quad_vert" type="x-shader/x-vertex">
-  attribute vec2 aVertexPosition;
-  attribute vec2 aVertexTextureCoords;
-  
-  varying vec2 vTexCoords;
-  
-  uniform int DEBUG;
-  varying float debug;
-  
-  void main( void ) {
-    gl_Position = vec4(aVertexPosition,0.0, 1.0);
-    debug = float(DEBUG);
-    vTexCoords = aVertexTextureCoords;
-  }
-</script>
-
-<script id="fs_quad_frag" type="x-shader/x-fragment">
-  precision mediump float;
-  
-  uniform sampler2D depthTexture;
-  uniform sampler2D normalsTexture;
-  uniform sampler2D albedoTexture;
-  
-  uniform vec4 projectionParams;
-  uniform mat4 inverseProjectionMatrix;
-  uniform mat4 uViewMatrix;
-  
-  varying vec2 vTexCoords;
-  
-  //uniform int DEBUG;
-  
-  varying float debug;
-  
-  #define PI 3.1415926535897932384626433832795
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  vec3 reconstructViewSpacePosition( float p_depth, vec2 p_ndc ) {
-  
-  	// these coords are uvs eg bottom left is 0,0
-  	//p_ndc = p_ndc * 2.0 - 1.0;
-  	float x = p_ndc.x;
-    float y = p_ndc.y;
-    vec4 vProjectedPos = vec4(x, y, p_depth, 1.0);
-    // Transform by the inverse projection matrix
-    vec4 vPositionVS = vProjectedPos * inverseProjectionMatrix;  
-    // Divide by w to get the view-space position
-    return vPositionVS.xyz / vPositionVS.w;  
-  	
-  	
-  }
-  
-  
-  
-  float chiGGX ( float v ) {
-  	return v > 0.0 ? 1.0 : 0.0;
-  }
-  
-  
-  float GGX_Distribution( vec3 n, vec3 h, float alpha ) {
-  	float NoH = dot(n,h);
-  	float alpha2 = alpha * alpha;
-  	float NoH2 = NoH * NoH;
-  	float den = NoH2 * alpha2 + (1.0-NoH2);
-  	return (chiGGX(NoH) * alpha2) / (PI * den * den);
-  }
-  
-  
-  //vec3 decodeNormal ( vec2 enc ) {
-  	//enc = enc * 2.0 - 1.0;
-  //	vec2 fenc = enc * 4.0 - 2.0;
-  //	float f = dot(fenc, fenc);
-  //	float g = sqrt(1.0-f/4.0);
-  //	vec3 n;
-  //	n.xy = fenc*g;
-  //	n.z = 1.0-f/2.0;
-  //	
-  //	//n = n * 2.0 - 1.0;
-  //	return n;
-  //}
-  
-  vec3 decodeNormal ( vec4 enc ) {
-  	vec4 nn = enc*vec4(2.0,2.0,0.0,0.0) + vec4(-1.0, -1.0, 1.0, -1.0);
-  	float l = dot(nn.xyz, -nn.xyw);
-  	nn.z = l;
-  	nn.xy *= sqrt(l);
-  	return nn.xyz * 2.0 + vec3(0.0,0.0,-1.0);
-  }
-  
-  float decodeDepth( vec4 rgba ) {
-  	return dot( rgba, vec4( 1.0, 1.0/255.0, 1.0/65025.0, 1.0/160581375.0) );
-  }
-  
-  void main (void) {
-  	
-  	float DEBUG = floor(debug);
-  	
-  	const vec3 specularColor = vec3(1.0);
-  	const float specularExponent = 15.0;
-  	
-  	
-  	
-    vec4 depthSample = texture2D(depthTexture, vTexCoords);
-    
-    if (DEBUG == 1.0) {
-    	gl_FragColor = vec4(depthSample.xyz, 1.0);
-    	return;
-    }
-    
-    
-    vec4 normalsSample = texture2D(normalsTexture, vTexCoords);
-    
-    if (DEBUG == 2.0) {
-    	gl_FragColor = normalsSample;
-    	return;
-    }
-    
-    vec3 matColor = texture2D( albedoTexture, vTexCoords).xyz;
-    matColor = pow ( matColor, vec3(2.2));
-    
-    if (DEBUG == 3.0) {
-    	gl_FragColor = vec4(matColor, 1.0);
-    	return;
-    }
-    
-    float decodedDepth = decodeDepth(depthSample);
-    
-    if (DEBUG == 4.0) {
-    	gl_FragColor = vec4(decodedDepth, decodedDepth, decodedDepth, 1.0);
-    	return;
-    }
-    
-    
-    vec4 decodedNormal = vec4(decodeNormal(  normalsSample ), 1.0);
-    
-    if (DEBUG == 5.0) {
-    	gl_FragColor = decodedNormal;
-    	return;
-    }
-    
-    
-    vec3 viewPosition = reconstructViewSpacePosition( decodedDepth, vTexCoords );
-    
-    if (DEBUG == 6.0) {
-    	gl_FragColor = vec4((viewPosition), 1.0);
-    	return;
-    }
-    
-    
-    vec3 worldPosition = viewPosition;
-    
-    vec3 eyeDirection = normalize(viewPosition);
-    
-    vec4 _sundir = uViewMatrix * normalize(vec4(0.0, -1.0, 0.0, 1.0));
-    
-    vec3 sunDir = _sundir.xyz;
-    
-    vec3 H = normalize(eyeDirection+sunDir);
-    vec3 N = decodedNormal.xyz;
-    
-    vec3 reflectionDirection = reflect(decodedNormal.xyz, sunDir );
-    
-    float specVal = pow(max(dot(reflectionDirection, eyeDirection), 0.0), specularExponent);
-    
-    //float specVal = pow( clamp( dot(N, H), 0.0, 1.0 ), 5.0 );
-    
-    float base = 1.0 - dot(eyeDirection, H);
-    float exponential = pow(base, 5.0);
-    float fresnel = exponential + 1.2 * (1.0 - exponential);
-    specVal *= fresnel;
-    
-    float sun = clamp( dot( decodedNormal.xyz, sunDir), 0.0, 1.0);
-    
-    float ind = clamp( dot( decodedNormal.xyz, normalize(sunDir*vec3(-1.0,0.0,-1.0)) ), 0.0, 1.0 );
-    
-    float sky = clamp( 0.5 + 0.5*decodedNormal.y, 0.0, 1.0 );
-    
-    vec3 lin = sun * vec3(1.64, 1.27, 0.99);
-    
-    
-    
-    lin += sky*vec3(0.16,0.20,0.28);
-    
-    lin += ind*vec3(0.40,0.28,0.20);
-    
-    lin += specularColor * specVal;
-    
-    vec3 color = matColor * lin;
-    
-    //color = mix(color, specularColor, specVal);
-    
-    color = pow( color, vec3(1.0/2.2) );
-    
-    gl_FragColor = vec4(color, 1.0);
-    
-    //gl_FragColor = decodedNormal;
-    //gl_FragColor = mix(d, decodedNormal, vTexCoords.x > 0.5 ? 1.0 : 0.0);
-  }
-</script>
-
-
-<script id="gbuffer_vert" type="x-shader/x-vertex">
-  attribute vec3 aVertexNormal;
-  attribute vec3 aVertexPosition;
-  attribute vec2 aVertexTextureCoords;
-  
-  uniform mat4 uMVMatrix;
-  uniform mat4 uPMatrix;
-  uniform mat3 uNormalMatrix;
-  
-  varying vec2 vTexCoords;
-  varying vec2 depthClipSpace;
-  varying vec3 vNormal;
-  varying vec3 vEyeDirection;
-  
-  void main (void) {
-      vTexCoords = aVertexTextureCoords;
-      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-      depthClipSpace = gl_Position.zw;
-      
-      vNormal = uNormalMatrix * aVertexNormal;
-      vEyeDirection = -gl_Position.xyz;
-  }
-</script>
-
-<script id="gbuffer_frag" type="x-shader/x-fragment">
-  #extension GL_EXT_draw_buffers : require
-  #extension GL_OES_standard_derivatives : require
-  precision highp float;
-  varying vec3 vNormal;
-  varying vec3 vEyeDirection;
-  varying vec2 vTexCoords;
-  varying vec2 depthClipSpace;
-  
-  uniform float farClip;
-  uniform float nearClip;
-  uniform sampler2D diffuseTex;
-  uniform sampler2D normalTex;
-  
-  
-  vec4 pack (float v) {
-	vec4 enc = vec4(1.0, 255.0, 65025.0, 160581375.0) * v;
-  	enc = fract(enc);
-  	enc -= enc.yzww * vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0);
-  	return enc;
-  }
-  
-  // Begin no-tangents normal mapping
-  mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
-  	// get edge vectors of the pixel triangle
-    vec3 dp1 = dFdx( p );
-    vec3 dp2 = dFdy( p );
-    vec2 duv1 = dFdx( uv );
-    vec2 duv2 = dFdy( uv );
- 
-    // solve the linear system
-    vec3 dp2perp = cross( dp2, N );
-    vec3 dp1perp = cross( N, dp1 );
-    vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-    vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-    // construct a scale-invariant frame 
-    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-    return mat3( T * invmax, B * invmax, N );
-  }
-  
-  vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ) {
-    // This is the regular model space normal
-    // save normal projection matrix till after this
-  	vec3 map = texture2D( normalTex, texcoord ).xyz;
-  	
-  	// is it an unsigned normal map? ( probably not )
-  	map = map * 255.0/127.0 - 128.0/127.0;
-  	
-  	// 2 channel normal map
-  	//map.z = sqrt( 1. - dot( map.xy, map.xy ) );
-  	
-  	// green as up
-  	//map.y = -map.y;
-  	
-  	mat3 TBN = cotangent_frame(N, V, texcoord);
-  	return normalize(TBN * map);
-  }
-  
-  
-  
-  // end no-tangents normal mapping
-  
-  	vec4 encodeNormal ( vec3 n ) {
-  		n = normalize(n);
-  		vec2 enc = normalize(n.xy) * (sqrt(-n.z*0.5+0.5));
-  		enc = enc * 0.5 + 0.5;
-  		return vec4(enc, 0.0, 1.0);
-  	}
-  	
-	//vec4 encodeNormal ( vec3 n ) {
-	//	float p = sqrt(n.z * 8.0 + 8.0);
-	//	return vec4(n.xy / p + 0.5, 0.0, 1.0);
-	//}
-  
-  void main (void) {
-  	vec3 tNormal = vNormal;
-  	//vec3 PN = perturb_normal( tNormal, vEyeDirection, vTexCoords );
-  	//vec4 n = encodeNormal( PN );
-  	
-  	vec4 n = encodeNormal( tNormal );
-  	
-    gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
-    gl_FragData[1] = n;
-    gl_FragData[2] = pack(-depthClipSpace.x / depthClipSpace.y);
-  }
-</script>
-
-
-
-
-
-
-
-
-
-
-
 <script type="text/javascript">
 
     var gl, deriv_ext, half_ext;
@@ -397,69 +38,7 @@
     }
 
 
-    function getShader(gl, id) {
-        var shaderScript = document.getElementById(id);
-        if (!shaderScript) {
-            return null;
-        }
-
-        var str = "";
-        var k = shaderScript.firstChild;
-        while (k) {
-            if (k.nodeType == 3) {
-                str += k.textContent;
-            }
-            k = k.nextSibling;
-        }
-
-        var shader;
-        if (shaderScript.type == "x-shader/x-fragment") {
-            shader = gl.createShader(gl.FRAGMENT_SHADER);
-        } else if (shaderScript.type == "x-shader/x-vertex") {
-            shader = gl.createShader(gl.VERTEX_SHADER);
-        } else {
-            return null;
-        }
-
-        gl.shaderSource(shader, str);
-        gl.compileShader(shader);
-
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            alert(gl.getShaderInfoLog(shader));
-            return null;
-        }
-
-        return shader;
-    }
-
-
     var shaderProgram;
-
-    function initShaders() {
-        var fragmentShader = getShader(gl, "shader-fs");
-        var vertexShader = getShader(gl, "shader-vs");
-
-        shaderProgram = gl.createProgram();
-        gl.attachShader(shaderProgram, vertexShader);
-        gl.attachShader(shaderProgram, fragmentShader);
-        gl.linkProgram(shaderProgram);
-
-        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-            alert("Could not initialise shaders");
-        }
-
-        gl.useProgram(shaderProgram);
-
-        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-        
-        
-        shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
-        gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
-
-        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-    }
 
 
     var mvMatrix = mat4.create();
@@ -518,72 +97,21 @@
     	
     	gbuffer.bind();
     	
+    	
     	gl.cullFace ( gl.BACK ) ;
     	gl.blendFunc( gl.ONE, gl.ZERO );
+    	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
+    	gl.enable(gl.CULL_FACE);
     	
-    	// set viewport dims
-        // gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-        
-        // clear viewport
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-		// create projection matrix
-        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-        
-        // create inverse projection matrix
-        //var pMatrixInverse = mat4.create();
-        //mat4.inverse(pMatrixInverse, pMatrix);
-        
-        
-        var projectionParams = new Float32Array(4);
-        
-        projectionParams[0] = pMatrix[0];
-        projectionParams[1] = pMatrix[5];
-        projectionParams[2] = pMatrix[10];
-        projectionParams[3] = pMatrix[11];
-
-		// reset model view matrix
-        mat4.identity(mvMatrix);
-
-		// move model view matrix to position for triangle
-        mat4.translate(mvMatrix, [0.0, 0.0, -30.0]);
-        
-        // scale it down a tad
-        mat4.scale(mvMatrix, [0.7, 0.7, 0.7]);
-        
-        
-       	// push the current model view matrix onto the stack ( so we can get back to it later ) 
-        mvPushMatrix();
-        
-        // rotate by the current triangle rotation
-        //mat4.rotate(mvMatrix, degToRad(rTri), [0,1,Math.sin(rTri*0.001)]);
-        
-        
-        
-        
-        var worldMatrix = teapot.getWorldTransform();
-        
-        //mat4.scale(worldMatrix, [0.4, 0.4, 0.4]);
-        
         var angle = degToRad(rTri);
         var radius = 40.0;
         
         
         camera.setPosition([ radius * Math.sin(angle), 27.0 * Math.sin(angle*0.5), radius * Math.cos(angle) ]);
         camera.updateViewMatrix();
-        camera.updateProjectionMatrix();
+        //camera.updateProjectionMatrix();
         
         var viewMatrix = camera.getViewMatrix();
-        
-        var worldViewMatrix = mat4.create();
-        
-        mat4.multiply( viewMatrix, worldMatrix, worldViewMatrix );
-        
-        
-        var normalMatrix = mat3.create();
-        
-        mat4.toInverseMat3(worldMatrix, normalMatrix);
-        mat3.transpose(normalMatrix);
         
         var projectionMatrix = camera.getProjectionMatrix();
         
@@ -591,7 +119,7 @@
         	var pot = pots[i];
         	
         	if (pot.bind()) { 
-        		pot.material.use()
+        		pot.material.use();
 	        	var worldMatrix = pot.getWorldTransform();
 	        	var worldViewMatrix = mat4.create(), normalMatrix = mat3.create();
 	        	mat4.multiply( viewMatrix, worldMatrix, worldViewMatrix );
@@ -599,7 +127,7 @@
 	        	mat4.toInverseMat3(worldMatrix, normalMatrix);
 	        	mat3.transpose(normalMatrix);
 	        	
-	        	pot.setMatrixUniforms(worldViewMatrix, projectionMatrix);
+	        	pot.setMatrixUniforms(worldViewMatrix, camera.getProjectionMatrix());
 	        	
 	        	gl.uniformMatrix3fv(pot.material.getUniform('uNormalMatrix'), false, normalMatrix);
         		gl.uniformMatrix4fv(pot.material.getUniform('uViewMatrix'), false, viewMatrix);
@@ -618,145 +146,71 @@
 	        	gl.uniform1i(pot.material.getUniform('normalTex'), 1);
         	
         	
-        		teapot.draw();
+        		pot.draw();
+        		pot.release();
         	
         	}
-        	
-        	
-        	
-        	
-        
         }
         
         
-        /* if (teapot.bind() ) {
-        	teapot.material.use();
-        	teapot.setMatrixUniforms(worldViewMatrix, camera.getProjectionMatrix());
-        	
-        	gl.uniformMatrix3fv(teapot.material.getUniform('uNormalMatrix'), false, normalMatrix);
-        	gl.uniformMatrix4fv(teapot.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
-        	
-        	teapot.setFloatUniform('farClip', camera.far);
-        	
-        	
-        	// bind textures
-        	gl.activeTexture(gl.TEXTURE0);
-        	gl.bindTexture(gl.TEXTURE_2D, teapot.material.diffuseMap);
-        	gl.uniform1i(teapot.material.getUniform('diffuseTex'), 0);
-        	
-        	
-        	gl.activeTexture(gl.TEXTURE1);
-        	gl.bindTexture(gl.TEXTURE_2D, teapot.material.normalMap);
-        	gl.uniform1i(teapot.material.getUniform('normalTex'), 1);
-        	
-        	
-        	teapot.draw();
-        	
-        	//teapot.release();
-        	
-        	
-        } */
-        
         gbuffer.release();
         
-        mvPopMatrix();
-        quad.material.use();
-        quad.bind();
+        if (quad) {
+        	quad.material.use();
+	        quad.bind();
+	        
+	        gl.activeTexture(gl.TEXTURE0);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
+	        
+	        gl.activeTexture(gl.TEXTURE1);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
+	        
+	        gl.activeTexture(gl.TEXTURE2);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
+	        
+	        gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
+	        gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
+	        gl.uniform1i(quad.material.getUniform('albedoTexture'), 2);
+	        
+	        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
+	        
+	        //gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
+	        
+	        gl.uniform1i(quad.material.getUniform('DEBUG'), DEBUG_VIEW);
+	        
+	        gl.drawArrays(gl.TRIANGLES, 0, quad.vertexBuffer.numItems);
+	        
+	        quad.release();
+        }
         
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
         
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
-        
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
-        
-        gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
-        gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
-        gl.uniform1i(quad.material.getUniform('albedoTexture'), 2);
-        
-        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
-        
-        gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
-        
-        gl.uniform1i(quad.material.getUniform('DEBUG'), DEBUG_VIEW);
-        
-        gl.drawArrays(gl.TRIANGLES, 0, quad.vertexBuffer.numItems);
-        
-        quad.release();
         
         //gl.disable( gl.CULL_FACE );
-        debug_material.use();
+        if (debug_material) {
+        	debug_material.use();
         
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
+	        gl.activeTexture(gl.TEXTURE0);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
+	        
+	        gl.activeTexture(gl.TEXTURE1);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
+	        
+	        gl.activeTexture(gl.TEXTURE2);
+	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
+	        
+	        gl.uniform1i(debug_material.getUniform('depthTexture'), 0);
+	        gl.uniform1i(debug_material.getUniform('normalsTexture'), 1);
+	        gl.uniform1i(debug_material.getUniform('albedoTexture'), 2);
+	        
+	        gl.uniformMatrix4fv(debug_material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
+	        
+	        //gl.uniform4f(debug_material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
+	        
+	        debug_grid.bind(debug_material);
+	        debug_grid.draw();
+	        debug_grid.release();
+        }
         
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
-        
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
-        
-        gl.uniform1i(debug_material.getUniform('depthTexture'), 0);
-        gl.uniform1i(debug_material.getUniform('normalsTexture'), 1);
-        gl.uniform1i(debug_material.getUniform('albedoTexture'), 2);
-        
-        gl.uniformMatrix4fv(debug_material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
-        
-        gl.uniform4f(debug_material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
-        
-        debug_grid.bind(debug_material);
-        debug_grid.draw();
-        debug_grid.release();
-        
-        
-        // tell gl we want to use the triangle vertex position buffer
-        // gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
-        
-        // assign that buffer to the shader vertex position attribute
-        //gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-        
-        // tell gl we want to use the triangle color buffer
-        //gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer);
-        
-        // assign the color attribute in the shader
-        //gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, triangleVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
-        
-        // update matrix uniforms
-        //setMatrixUniforms();
-        
-        // draw triangle
-        //gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
-        
-        // pop the matrix stack so we're back to just the position offset
-        
-
-		// move model view matrix to position for square
-        //mat4.translate(mvMatrix, [3.0, 0.0, -2.0]);
-        
-        // push the model view matrix onto the stack again
-        //mvPushMatrix();
-        
-        // rotate it for the square
-        //mat4.rotate(mvMatrix, degToRad(rSquare), [1,0,0]);
-        
-        // bind vertex position buffer to draw
-        //gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-        //gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-        
-        // bind vertex color buffer to draw
-        //gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexColorBuffer);
-        //gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, squareVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
-        
-        // set uniforms for the matrix
-        // setMatrixUniforms();
-        
-       	// draw him
-      	//gl.drawArrays(gl.TRIANGLE_STRIP, 0, squareVertexPositionBuffer.numItems);
-      	
-      	// get the original transform matrix back
-      	//mvPopMatrix();
     }
 	
 	var lastTime = 0;
@@ -782,43 +236,42 @@
 	var teapot, quad, camera, debug_grid, debug_material;
 	var pots = [];
 	
-	var pots_per_side = 10;
+	var pots_per_side = 5;
 	var pots_half = 25.0 * pots_per_side / 2;
 
 	function loadModel () {
-	
-		var mat = new DFIR.Shader( "gbuffer_vert", "gbuffer_frag" );
-		for ( var x = 0; x < pots_per_side; x++ )  {
-			for (var y =0; y < pots_per_side; y++) { 
-			   pot = new DFIR.JSONGeometry('models/teapot.json');
-			   pot.setMaterial(mat);
-			   pot.material.setDiffuseMap('textures/diffuse.jpg');
-			   pot.material.setNormalMap('textures/normals.png');
-			   pot.setPosition([-pots_half + (x * 25.0), 0.0, -pots_half + (y * 25.0) ]);
-			   pot.setScale([0.5,0.5,0.5]);
-			   pots.push(pot);
+		
+		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
+			var mat = new DFIR.Shader( program );
+			
+			for ( var x = 0; x < pots_per_side; x++ )  {
+				for (var y =0; y < pots_per_side; y++) { 
+				   pot = new DFIR.JSONGeometry('models/teapot.json');
+				   pot.setMaterial(mat);
+				   pot.material.setDiffuseMap('textures/diffuse.jpg');
+				   pot.material.setNormalMap('textures/normals.png');
+				   pot.setPosition([-pots_half + (x * 25.0), 0.0, -pots_half + (y * 25.0) ]);
+				   //pot.setScale([0.5,0.5,0.5]);
+				   pots.push(pot);
+				}
 			}
-		}
-		teapot = new DFIR.JSONGeometry('models/teapot.json');
-		teapot.setMaterial ( new DFIR.Shader( "gbuffer_vert", "gbuffer_frag" ) );
-		teapot.material.setDiffuseMap('textures/diffuse.jpg');
-		teapot.material.setNormalMap('textures/normals.png');
-		teapot.material.showInfo();
-		teapot.setPosition( [0.0, 0.0, 0.0]);
-		teapot.setScale([0.5, 0.5, 0.5]); 
+		});
 		
-		quad = new DFIR.FullscreenQuad();
-		quad.setMaterial ( new DFIR.Shader ( "fs_quad_vert", "fs_quad_frag" ));
-		quad.material.showInfo();
+		DFIR.ShaderLoader.load( 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', function (program) {
+			quad = new DFIR.FullscreenQuad();
+			quad.setMaterial ( new DFIR.Shader ( program ));
+			quad.material.showInfo();
+		});
 		
 		
-		debug_grid = new DFIR.DebugGridView(6);
-		debug_material = new DFIR.Shader ( "debug_grid_vert", "fs_quad_frag" );
+		DFIR.ShaderLoader.load('shaders/debug_grid_vert.glsl', 'shaders/fs_quad_frag.glsl', function (program) {
+			debug_grid = new DFIR.DebugGridView(6);
+			debug_material = new DFIR.Shader ( program );
+		});
 		
-		
-		camera = new DFIR.Camera();
+		camera = new DFIR.Camera(gbuffer.width, gbuffer.height);
 		camera.setPosition([ 0.0, 1.0, 10.0 ]);
-		camera.setFarClip(600.0);
+		camera.setFarClip(500.0);
 		
 	}
 

@@ -1,5 +1,5 @@
 (function() {
-  var DebugView, buildProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadTexture, pixelsToClip, shader_type_enums,
+  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, pixelsToClip, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -144,6 +144,7 @@
     function Object3D() {
       this.position = vec3.create();
       this.scale = vec3.create();
+      this.scale[0] = this.scale[1] = this.scale[2] = 1.0;
       this.transformDirty = true;
       this.worldTransform = mat4.create();
       this.children = [];
@@ -153,7 +154,6 @@
     Object3D.prototype.getWorldTransform = function() {
       if (this.transformDirty === true) {
         this.updateWorldTransform();
-        console.log(this, this.worldTransform);
       }
       return this.worldTransform;
     };
@@ -247,7 +247,6 @@
     var request;
     request = new XMLHttpRequest();
     request.open('GET', url);
-    console.log("Loading json: " + url);
     request.onreadystatechange = function() {
       if (request.readyState === 4) {
         return callback(JSON.parse(request.responseText));
@@ -367,13 +366,107 @@
     return shader;
   };
 
-  buildProgram = function(vertexSourceId, fragmentSourceId) {
-    var fragmentShader, shaderProgram, vertexShader;
-    fragmentShader = getShader(fragmentSourceId);
-    vertexShader = getShader(vertexSourceId);
+  DFIR.ShaderSource = (function() {
+    function ShaderSource(vertexSource1, fragmentSource1) {
+      this.vertexSource = vertexSource1;
+      this.fragmentSource = fragmentSource1;
+    }
+
+    return ShaderSource;
+
+  })();
+
+  DFIR.ShaderLoader = (function() {
+    function ShaderLoader(vertUrl1, fragUrl1, callback1) {
+      this.vertUrl = vertUrl1;
+      this.fragUrl = fragUrl1;
+      this.callback = callback1;
+      this.onVertexLoaded = bind(this.onVertexLoaded, this);
+      this.onFragmentLoaded = bind(this.onFragmentLoaded, this);
+      this.fragmentLoaded = false;
+      this.vertexLoaded = false;
+      this.result = new DFIR.ShaderSource();
+      loadShaderAjax(this.vertUrl, this.onVertexLoaded);
+      loadShaderAjax(this.fragUrl, this.onFragmentLoaded);
+    }
+
+    ShaderLoader.prototype.checkLoaded = function() {
+      var loaded;
+      loaded = this.fragmentLoaded && this.vertexLoaded;
+      return this.fragmentLoaded && this.vertexLoaded;
+    };
+
+    ShaderLoader.prototype.buildShader = function() {
+      return buildShaderProgram(this.result.vertexSource, this.result.fragmentSource);
+    };
+
+    ShaderLoader.prototype.onFragmentLoaded = function(data) {
+      var fragShader;
+      fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragShader, data);
+      gl.compileShader(fragShader);
+      this.result.fragmentSource = fragShader;
+      this.fragmentLoaded = true;
+      if (this.checkLoaded()) {
+        return this.callback(this.buildShader());
+      }
+    };
+
+    ShaderLoader.prototype.onVertexLoaded = function(data) {
+      var vertShader;
+      vertShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertShader, data);
+      gl.compileShader(vertShader);
+      this.result.vertexSource = vertShader;
+      this.vertexLoaded = true;
+      if (this.checkLoaded()) {
+        return this.callback(this.buildShader());
+      }
+    };
+
+    ShaderLoader.load = function(vertUrl, fragUrl, callback) {
+      return new ShaderLoader(vertUrl, fragUrl, callback);
+    };
+
+    return ShaderLoader;
+
+  })();
+
+  loadResource = function(url, callback) {};
+
+  loadShaderAjax = function(url, callback) {
+    var request;
+    request = new XMLHttpRequest();
+    request.open('GET', url);
+    request.onreadystatechange = function() {
+      if (request.readyState === 4) {
+        return callback(request.responseText);
+      }
+    };
+    return request.send();
+  };
+
+  buildShaderProgram = function(vertexShader, fragmentShader) {
+    var shaderProgram;
     shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+    return shaderProgram;
+  };
+
+  buildProgram = function(vertexSourceId, fragmentSourceId) {
+    var fragmentShader, vertexShader;
+    fragmentShader = getShader(fragmentSourceId);
+    vertexShader = getShader(vertexSourceId);
+    return buildProgramFromStrings(vertexShader, fragmentShader);
+  };
+
+  buildProgramFromStrings = function(vertexSource, fragmentSource) {
+    var shaderProgram;
+    shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexSource);
+    gl.attachShader(shaderProgram, fragmentSource);
     gl.linkProgram(shaderProgram);
     return shaderProgram;
   };
@@ -466,9 +559,8 @@
   })();
 
   DFIR.Shader = (function() {
-    function Shader(vertSourceId, fragSourceId) {
-      this.name = vertSourceId;
-      this.program = buildProgram(vertSourceId, fragSourceId);
+    function Shader(program1) {
+      this.program = program1;
       this.params = getShaderParams(this.program);
       this.diffuseMapLoaded = this.normalMapLoaded = false;
       this.buildUniforms();
@@ -542,13 +634,21 @@
   DFIR.Camera = (function(superClass) {
     extend(Camera, superClass);
 
-    function Camera() {
+    function Camera(viewportWidth, viewportHeight) {
+      this.viewportWidth = viewportWidth;
+      this.viewportHeight = viewportHeight;
       Camera.__super__.constructor.call(this);
+      if (this.viewportWidth == null) {
+        this.viewportWidth = gl.viewportWidth;
+      }
+      if (this.viewportHeight == null) {
+        this.viewportHeight = gl.viewportHeight;
+      }
       this.target = vec3.create();
       this.fov = 45.0;
       this.up = vec3.create([0.0, 1.0, 0.0]);
       this.viewMatrix = mat4.create();
-      this.near = 1.0;
+      this.near = 0.001;
       this.far = 60.0;
       this.updateViewMatrix();
       this.projectionMatrix = mat4.create();
@@ -581,7 +681,7 @@
       w = vec3.create();
       vec3.cross(viewVector, this.up, w);
       fov = this.fov * Math.PI / 180.0;
-      ar = gl.viewportWidth / gl.viewportHeight;
+      ar = this.viewportWidth / this.viewportHeight;
       Hnear = 2 * Math.tan(fov / 2.0) * this.near;
       Wnear = Hnear * ar;
       Hfar = 2 * Math.tan(fov / 2.0) * this.far;
@@ -609,8 +709,8 @@
     Camera.prototype.updateProjectionMatrix = function() {
       var aspect;
       mat4.identity(this.projectionMatrix);
-      aspect = gl.viewportWidth / gl.viewportHeight;
-      return mat4.perspective(this.fov, gl.viewportWidth / gl.viewportHeight, this.near, this.far, this.projectionMatrix);
+      aspect = this.viewportWidth / this.viewportHeight;
+      return mat4.perspective(this.fov, this.viewportWidth / this.viewportHeight, this.near, this.far, this.projectionMatrix);
     };
 
     return Camera;
@@ -719,7 +819,6 @@
       this.indices = [];
       f = 0;
       for (current_level = j = 1, ref = num_levels; 1 <= ref ? j <= ref : j >= ref; current_level = 1 <= ref ? ++j : --j) {
-        console.log(current_level);
         verts = [x, y, current_level, x + ht, y, current_level, x + ht, y + ht, current_level, x, y + ht, current_level];
         texcoords = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
         indices = [f, f + 1, f + 2, f + 2, f + 3, f];
@@ -731,9 +830,7 @@
       }
       this.vertexBuffer = new DFIR.Buffer(new Float32Array(this.vertices), 3, gl.STATIC_DRAW);
       this.textureBuffer = new DFIR.Buffer(new Float32Array(this.textureCoords), 2, gl.STATIC_DRAW);
-      this.indexBuffer = new DFIR.Buffer(new Uint16Array(this.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
-      console.log(this.indices);
-      return console.log(this.vertices);
+      return this.indexBuffer = new DFIR.Buffer(new Uint16Array(this.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
     };
 
     DebugGridView.prototype.bind = function(material) {
