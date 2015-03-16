@@ -1,5 +1,5 @@
 (function() {
-  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, gbuffer_frag, gbuffer_vert, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, pixelsToClip, shader_type_enums,
+  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, pixelsToClip, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -716,10 +716,6 @@
     return Camera;
 
   })(DFIR.Object3D);
-
-  gbuffer_vert = "\nattribute vec3 aVertexNormal;\nattribute vec3 aVertexPosition;\nattribute vec2 aVertexTextureCoords;\n\nuniform mat4 uMVMatrix;\nuniform mat4 uPMatrix;\n\nvarying vec2 vTexCoords;\nvarying float depth;\nvarying vNormal;\n\nvoid main (void) {\n    vTexCoords = aVertexTextureCoords;\n    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);    \n    depth = gl_Position.z;\n    vec4 n = uMVMatrix * vec4(aVertexNormal, 1.0);\n    vNormal = vec3(n.xyz);\n}";
-
-  gbuffer_frag = "#extension GL_EXT_draw_buffers : require\nprecision mediump float;\nvarying vec3 vNormal;\nvarying vec2 vTexCoords;\nvarying float depth;\n\nuniform float farClip;\nuniform float nearClip;\n\nvec4 pack (float depth) {\n  const vec4 bitSh = vec4(\n    256*256*256,\n    256*256,\n    256,\n    1.0\n  );\n  \n  const vec4 bitMask = vec4 (\n    0.0,\n    1.0 / 256.0,\n    1.0 / 256.0,\n    1.0 / 256.0\n  );\n  \n  vec4 comp = fract(depth * bitSh);\n  comp -= comp.xxyz * bitMask;\n  return comp;\n}\n\n\nvoid main (void) {\n  gl_FragData[0] = vec4(0.5,0.5,0.5,1.0);\n  gl_FragData[1] = vec4(vNormal, 1.0);\n  gl_FragData[2] = pack(1.0 - depth/farClip);\n}";
 
   DFIR.Gbuffer = (function() {
     function Gbuffer(resolution) {

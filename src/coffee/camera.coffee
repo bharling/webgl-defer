@@ -10,7 +10,7 @@ class DFIR.Camera extends DFIR.Object3D
     @fov = 45.0
     @up = vec3.create [0.0, 1.0, 0.0]
     @viewMatrix = mat4.create()
-    @near = 0.001
+    @near = 0.01
     @far = 60.0
     @updateViewMatrix()
     @projectionMatrix = mat4.create()

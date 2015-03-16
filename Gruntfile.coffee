@@ -29,6 +29,10 @@ module.exports = (grunt) ->
       markup:
         files: ['index.html']
         tasks: []
+        
+      shaders:
+        files: ['shaders/*.glsl']
+        tasks: []
       
       coffee:
         files: [ 'src/**/*.coffee' ]
