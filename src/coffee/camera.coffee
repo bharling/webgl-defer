@@ -2,7 +2,6 @@ class DFIR.Camera extends DFIR.Object3D
   constructor: (@viewportWidth, @viewportHeight) ->
     super()
     
-    
     @viewportWidth ?= gl.viewportWidth
     @viewportHeight ?= gl.viewportHeight
     

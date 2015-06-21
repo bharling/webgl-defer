@@ -4,7 +4,7 @@
   uniform sampler2D normalsTexture;
   uniform sampler2D albedoTexture;
   
-  //uniform vec4 projectionParams;
+  uniform vec4 projectionParams;
   uniform mat4 inverseProjectionMatrix;
   uniform mat4 uViewMatrix;
   
@@ -20,15 +20,20 @@
   
   	// these coords are uvs eg bottom left is 0,0
   	//p_ndc = p_ndc * 2.0 - 1.0;
-  	float x = p_ndc.x;
-    float y = p_ndc.y;
-    vec4 vProjectedPos = vec4(x, y, p_depth, 1.0);
+  	//float x = p_ndc.x;
+    //float y = p_ndc.y;
+    //vec4 vProjectedPos = vec4(x, y, p_depth, 1.0);
     // Transform by the inverse projection matrix
-    vec4 vPositionVS = vProjectedPos * inverseProjectionMatrix;  
+    //vec4 vPositionVS = vProjectedPos * inverseProjectionMatrix;  
     // Divide by w to get the view-space position
-    return vPositionVS.xyz / vPositionVS.w;  
+    //return vPositionVS.xyz / vPositionVS.w;  
   	
+  	p_ndc = p_ndc * 2.0 - 1.0;
+  	p_depth = p_depth * 2.0 - 1.0;
   	
+  	float viewDepth = projectionParams.w / (depth - projectionParams.z);
+
+    return vec3((p_ndc * viewDepth) / projectionParams.xy, viewDepth);
   }
   
   float chiGGX ( float v ) {
@@ -161,7 +166,7 @@
     
     lin += ind*vec3(0.40,0.28,0.20);
     
-    lin += specularColor * specVal;
+    //lin += specularColor * specVal;
     
     vec3 color = matColor * lin;
     

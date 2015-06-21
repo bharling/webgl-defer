@@ -115,6 +115,14 @@
         
         var projectionMatrix = camera.getProjectionMatrix();
         
+        var projectionParams = [];
+        
+        projectionParams[0] = projectionMatrix[0];
+        projectionParams[1] = projectionMatrix[5];
+        projectionParams[2] = projectionMatrix[10];
+        projectionParams[3] = projectionMatrix[11];
+        
+        
         for ( var i=0; i < pots.length; i ++ ) {
         	var pot = pots[i];
         	
@@ -174,7 +182,7 @@
 	        
 	        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
 	        
-	        //gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
+	        gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
 	        
 	        gl.uniform1i(quad.material.getUniform('DEBUG'), DEBUG_VIEW);
 	        
