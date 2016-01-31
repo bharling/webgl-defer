@@ -8,7 +8,8 @@ module.exports = (grunt) ->
     'src/coffee/object.coffee', 
     'src/coffee/json_model.coffee' , 
     'src/coffee/shader.coffee',
-    'src/coffee/camera.coffee', 
+    'src/coffee/camera.coffee',
+    'src/coffee/lights.coffee',
     'src/coffee/Gbuffer.coffee', 
     'src/coffee/fullscreenQuad.coffee',
     'src/coffee/debug_view.coffee']

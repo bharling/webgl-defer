@@ -359,6 +359,7 @@
     }
     gl.shaderSource(shader, str);
     gl.compileShader(shader);
+    console.log(id, gl.getShaderInfoLog(shader));
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
       console.log(id, gl.getShaderInfoLog(shader));
       return null;
@@ -405,6 +406,7 @@
       fragShader = gl.createShader(gl.FRAGMENT_SHADER);
       gl.shaderSource(fragShader, data);
       gl.compileShader(fragShader);
+      console.log(gl.getShaderInfoLog(fragShader));
       this.result.fragmentSource = fragShader;
       this.fragmentLoaded = true;
       if (this.checkLoaded()) {
@@ -417,6 +419,7 @@
       vertShader = gl.createShader(gl.VERTEX_SHADER);
       gl.shaderSource(vertShader, data);
       gl.compileShader(vertShader);
+      console.log(gl.getShaderInfoLog(vertShader));
       this.result.vertexSource = vertShader;
       this.vertexLoaded = true;
       if (this.checkLoaded()) {
@@ -452,6 +455,7 @@
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
     gl.linkProgram(shaderProgram);
+    console.log(gl.getProgramInfoLog(shaderProgram));
     return shaderProgram;
   };
 
@@ -468,6 +472,7 @@
     gl.attachShader(shaderProgram, vertexSource);
     gl.attachShader(shaderProgram, fragmentSource);
     gl.linkProgram(shaderProgram);
+    console.log(gl.getProgramInfoLog(shaderProgram));
     return shaderProgram;
   };
 
@@ -648,7 +653,7 @@
       this.fov = 45.0;
       this.up = vec3.create([0.0, 1.0, 0.0]);
       this.viewMatrix = mat4.create();
-      this.near = 0.001;
+      this.near = 0.01;
       this.far = 60.0;
       this.updateViewMatrix();
       this.projectionMatrix = mat4.create();
@@ -717,6 +722,22 @@
 
   })(DFIR.Object3D);
 
+  DFIR.DirectionalLight = (function(superClass) {
+    extend(DirectionalLight, superClass);
+
+    function DirectionalLight() {
+      return DirectionalLight.__super__.constructor.apply(this, arguments);
+    }
+
+    DirectionalLight.prototype.bind = function(uniforms) {
+      gl.uniform3fv(uniforms.lightColor, this.color);
+      return gl.uniform3fv(uniforms.lightDirection, this.direction);
+    };
+
+    return DirectionalLight;
+
+  })(DFIR.Object3D);
+
   DFIR.Gbuffer = (function() {
     function Gbuffer(resolution) {
       this.resolution = resolution != null ? resolution : 1.0;
@@ -726,22 +747,20 @@
     }
 
     Gbuffer.prototype.createFrameBuffer = function() {
-      this.ext = gl.getExtension('WEBGL_draw_buffers');
+      this.mrt_ext = gl.getExtension('WEBGL_draw_buffers');
       this.half_ext = gl.getExtension("OES_texture_half_float");
-      this.DepthEXT = gl.getExtension("WEBKIT_WEBGL_depth_texture") || gl.getExtension("WEBGL_depth_texture");
+      this.depth_ext = gl.getExtension("WEBKIT_WEBGL_depth_texture") || gl.getExtension("WEBGL_depth_texture");
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
       this.albedoTextureUnit = this.createTexture();
       this.normalsTextureUnit = this.createTexture(half_ext.HALF_FLOAT_OES);
-      this.depthTextureUnit = this.createTexture();
       this.depthComponent = this.createDepthTexture();
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, this.depthTextureUnit, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depthComponent, 0);
       console.log("GBuffer FrameBuffer status after initialization: ");
       console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE);
-      this.ext.drawBuffersWEBGL([this.ext.COLOR_ATTACHMENT0_WEBGL, this.ext.COLOR_ATTACHMENT1_WEBGL, this.ext.COLOR_ATTACHMENT2_WEBGL]);
+      this.mrt_ext.drawBuffersWEBGL([this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL]);
       return this.release();
     };
 
@@ -771,7 +790,8 @@
     };
 
     Gbuffer.prototype.bind = function() {
-      return gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      return gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     };
 
     Gbuffer.prototype.release = function() {
@@ -780,7 +800,7 @@
     };
 
     Gbuffer.prototype.getDepthTextureUnit = function() {
-      return this.depthTextureUnit;
+      return this.depthComponent;
     };
 
     Gbuffer.prototype.getAlbedoTextureUnit = function() {

@@ -17,5 +17,6 @@ attribute vec2 aVertexTextureCoords;
       depthClipSpace = gl_Position.zw;
       
       vNormal = uNormalMatrix * aVertexNormal;
+      vNormal = aVertexNormal;
       vEyeDirection = -gl_Position.xyz;
   }

@@ -44,6 +44,9 @@
     var mvMatrix = mat4.create();
     var pMatrix = mat4.create();
     var mvMatrixStack = [];
+   	var sunLight;
+
+   	
     
     function mvPushMatrix() {
     	var copy = mat4.create();
@@ -104,10 +107,13 @@
     	gl.enable(gl.CULL_FACE);
     	
         var angle = degToRad(rTri);
-        var radius = 40.0;
+        var radius = 100.0;
         
         
-        camera.setPosition([ radius * Math.sin(angle), 27.0 * Math.sin(angle*0.5), radius * Math.cos(angle) ]);
+        //camera.setPosition([ radius * Math.sin(angle), 27.0 * Math.sin(angle*0.5), radius * Math.cos(angle) ]);
+
+        sunLight.setPosition([ radius * Math.sin(angle), 27.0, radius * Math.cos(angle) ]);
+
         camera.updateViewMatrix();
         //camera.updateProjectionMatrix();
         
@@ -171,6 +177,12 @@
 	        gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
 	        gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
 	        gl.uniform1i(quad.material.getUniform('albedoTexture'), 2);
+
+	        gl.uniform3fv(quad.material.getUniform('lightPosition'), sunLight.position);
+
+	        //console.log(sunLight.position)
+
+	        //sunLight.bind(quad.material.uniforms);
 	        
 	        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
 	        
@@ -237,7 +249,7 @@
 	var pots = [];
 	
 	var pots_per_side = 5;
-	var pots_half = 25.0 * pots_per_side / 2;
+	var pots_half = 30.0 * pots_per_side / 2;
 
 	function loadModel () {
 		
@@ -250,7 +262,8 @@
 				   pot.setMaterial(mat);
 				   pot.material.setDiffuseMap('textures/diffuse.jpg');
 				   pot.material.setNormalMap('textures/normals.png');
-				   pot.setPosition([-pots_half + (x * 25.0), 0.0, -pots_half + (y * 25.0) ]);
+				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 25.0) ]);
+				   
 				   //pot.setScale([0.5,0.5,0.5]);
 				   pots.push(pot);
 				}
@@ -270,9 +283,11 @@
 		});
 		
 		camera = new DFIR.Camera(gbuffer.width, gbuffer.height);
-		camera.setPosition([ 0.0, 1.0, 10.0 ]);
+		camera.setPosition([ 0.0, 40.0, -200.0 ]);
 		camera.setNearClip(1.0);
 		camera.setFarClip(500.0);
+		sunLight = new DFIR.DirectionalLight(vec3.create(0.0, 1.0, 0.5));
+
 		
 	}
 

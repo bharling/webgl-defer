@@ -19,6 +19,8 @@ getShader = (id) ->
   gl.shaderSource shader, str
   gl.compileShader shader
   
+  console.log id, gl.getShaderInfoLog( shader )
+
   if !gl.getShaderParameter(shader, gl.COMPILE_STATUS)
     console.log id, gl.getShaderInfoLog( shader )
     return null
@@ -51,6 +53,9 @@ class DFIR.ShaderLoader
     fragShader = gl.createShader gl.FRAGMENT_SHADER
     gl.shaderSource fragShader, data
     gl.compileShader fragShader
+
+    console.log gl.getShaderInfoLog( fragShader )
+
     @result.fragmentSource = fragShader
     @fragmentLoaded = true
     if @checkLoaded()
@@ -61,6 +66,9 @@ class DFIR.ShaderLoader
     vertShader = gl.createShader gl.VERTEX_SHADER
     gl.shaderSource vertShader, data
     gl.compileShader vertShader
+
+    console.log gl.getShaderInfoLog( vertShader )
+    
     @result.vertexSource = vertShader
     @vertexLoaded = true
     if @checkLoaded()
@@ -89,6 +97,9 @@ buildShaderProgram = (vertexShader, fragmentShader) ->
   gl.attachShader shaderProgram, vertexShader
   gl.attachShader shaderProgram, fragmentShader
   gl.linkProgram shaderProgram
+
+  console.log gl.getProgramInfoLog( shaderProgram )
+ 
   shaderProgram
   
 buildProgram = (vertexSourceId, fragmentSourceId) ->
@@ -101,6 +112,9 @@ buildProgramFromStrings = (vertexSource, fragmentSource) ->
   gl.attachShader shaderProgram, vertexSource
   gl.attachShader shaderProgram, fragmentSource
   gl.linkProgram shaderProgram
+
+  console.log gl.getProgramInfoLog( shaderProgram )
+
   shaderProgram
 
   

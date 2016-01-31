@@ -8,6 +8,7 @@
   
   uniform float farClip;
   uniform float nearClip;
+  uniform mat3 uNormalMatrix;
   uniform sampler2D diffuseTex;
   uniform sampler2D normalTex;
   
@@ -63,7 +64,7 @@
   	vec4 encodeNormal ( vec3 n ) {
   		n = normalize(n);
   		vec2 enc = normalize(n.xy) * (sqrt(-n.z*0.5+0.5));
-  		enc = enc * 0.5 + 0.5;
+  		//enc = enc * 0.5 + 0.5;
   		return vec4(enc, 0.0, 1.0);
   	}
   	
@@ -73,13 +74,27 @@
 	//}
   
   void main (void) {
-  	vec3 tNormal = vNormal;
+  	//vec3 tNormal = vNormal;
   	//vec3 PN = perturb_normal( tNormal, vEyeDirection, vTexCoords );
   	//vec4 n = encodeNormal( PN );
+
+    vec3 normal = normalize(uNormalMatrix * vNormal);
+    vec3 tangent = normalize(uNormalMatrix[0]);
+    vec3 binormal = normalize(uNormalMatrix[1]);
+    mat3 tangentToWorld = mat3(tangent.x, binormal.x, normal.x,
+                               tangent.y, binormal.y, normal.y,
+                               tangent.z, binormal.z, normal.z);
+
+    vec3 _normal = (texture2D( normalTex, vTexCoords ).xyz) * tangentToWorld;
+
+    float metalness = 0.6;
+    float roughness = 0.2;
   	
-  	vec4 n = encodeNormal( tNormal );
+    vec3 n = _normal * 0.5 + 0.5;
+
+  	//vec4 n = encodeNormal( _normal );
   	
     gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
-    gl_FragData[1] = n;
-    gl_FragData[2] = pack(-depthClipSpace.x / depthClipSpace.y);
+    gl_FragData[1] = vec4( n.xyz, 1.0 );
+    //gl_FragData[2] = pack(-depthClipSpace.x / depthClipSpace.y);
   }

@@ -7,12 +7,11 @@ class DFIR.Gbuffer
     
     
   createFrameBuffer: ->
-    @ext = gl.getExtension 'WEBGL_draw_buffers'
+    @mrt_ext = gl.getExtension 'WEBGL_draw_buffers'
     
     @half_ext = gl.getExtension("OES_texture_half_float")
     
-    @DepthEXT = gl.getExtension( "WEBKIT_WEBGL_depth_texture" ) or gl.getExtension( "WEBGL_depth_texture" )
-    
+    @depth_ext = gl.getExtension( "WEBKIT_WEBGL_depth_texture" ) or gl.getExtension( "WEBGL_depth_texture" )
     
     @frameBuffer = gl.createFramebuffer()
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
@@ -20,12 +19,12 @@ class DFIR.Gbuffer
     # create Texture Units
     @albedoTextureUnit = @createTexture()
     @normalsTextureUnit = @createTexture(half_ext.HALF_FLOAT_OES)
-    @depthTextureUnit = @createTexture()
+    #@depthTextureUnit = @createTexture()
     @depthComponent = @createDepthTexture()
     
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, @albedoTextureUnit, 0
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, @normalsTextureUnit, 0
-    gl.framebufferTexture2D gl.FRAMEBUFFER, @ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
+    gl.framebufferTexture2D gl.FRAMEBUFFER, @mrt_ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, @albedoTextureUnit, 0
+    gl.framebufferTexture2D gl.FRAMEBUFFER, @mrt_ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, @normalsTextureUnit, 0
+    #gl.framebufferTexture2D gl.FRAMEBUFFER, @mrt_ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
     gl.framebufferTexture2D gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, @depthComponent, 0
     
     
@@ -34,10 +33,10 @@ class DFIR.Gbuffer
     
     
     # set draw targets
-    @ext.drawBuffersWEBGL [
-        @ext.COLOR_ATTACHMENT0_WEBGL,
-        @ext.COLOR_ATTACHMENT1_WEBGL,
-        @ext.COLOR_ATTACHMENT2_WEBGL
+    @mrt_ext.drawBuffersWEBGL [
+        @mrt_ext.COLOR_ATTACHMENT0_WEBGL,
+        @mrt_ext.COLOR_ATTACHMENT1_WEBGL,
+        #@mrt_ext.COLOR_ATTACHMENT2_WEBGL
       ]
       
     @release()
@@ -74,6 +73,7 @@ class DFIR.Gbuffer
 
   bind: ->
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+    gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
 
 
   release : ->
@@ -82,7 +82,7 @@ class DFIR.Gbuffer
     
     
   getDepthTextureUnit: ->
-    @depthTextureUnit
+    @depthComponent #@depthTextureUnit
     
   getAlbedoTextureUnit: ->
     @albedoTextureUnit
