@@ -154,19 +154,19 @@
 
     float sun = clamp( dot( decodedNormal.xyz, sunDir), 0.0, 1.0);
 
-    //float ind = clamp( dot( decodedNormal.xyz, normalize(sunDir*vec3(-1.0,0.0,-1.0)) ), 0.0, 1.0 );
+    float ind = clamp( dot( decodedNormal.xyz, normalize(sunDir*vec3(-1.0,0.0,-1.0)) ), 0.0, 1.0 );
 
-    //float sky = clamp( 0.5 + 0.5*decodedNormal.y, 0.0, 1.0 );
+    float sky = clamp( 0.5 + 0.5*decodedNormal.y, 0.0, 1.0 );
 
     vec3 lin = sun * vec3(1.64, 1.27, 0.99);
 
 
 
-    //lin += sky*vec3(0.16,0.20,0.28);
+    lin += sky*vec3(0.16,0.20,0.28);
 
-    //lin += ind*vec3(0.40,0.28,0.20) * 0.2;
+    lin += ind*vec3(0.40,0.28,0.20) * 0.2;
 
-    //lin += specularColor * specVal;
+    lin += specularColor * specVal;
 
     vec3 color = matColor * lin;
 

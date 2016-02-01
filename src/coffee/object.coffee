@@ -14,6 +14,9 @@ class DFIR.Object3D
     #@rotationQuaternion = quat.create()
     @transformDirty = true
     @worldTransform = mat4.create()
+    @worldViewMatrix = mat4.create()
+    @normalMatrix = mat3.create()
+    @worldViewProjectionMatrix = mat4.create()
     @children = []
     @visible = true
 
@@ -28,7 +31,44 @@ class DFIR.Object3D
     mat3.transpose normalMatrix, normalMatrix
     normalMatrix
 
+  draw: (camera) ->
+    if !@material or !@loaded
+      return
 
+    @material.use()
+    #mat4.identity @worldViewMatrix
+    #mat3.identity @normalMatrix
+    @updateWorldTransform()
+    mat4.multiply @worldViewMatrix, camera.getViewMatrix(), @worldTransform
+    mat3.normalFromMat4 @normalMatrix, @worldViewMatrix
+    
+    @setMatrixUniforms(camera)
+
+    @bindTextures()
+
+    gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
+    gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
+
+
+  bindTextures: () ->
+    gl.activeTexture gl.TEXTURE0
+    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
+    gl.uniform1i @material.getUniform('diffuseTex'), 0 
+
+
+    gl.activeTexture gl.TEXTURE1 
+    gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
+    gl.uniform1i @material.getUniform('normalTex'), 1
+
+  setMatrixUniforms: (camera) ->
+    if !@material
+      return null
+
+    gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, @worldViewMatrix
+    gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, camera.getProjectionMatrix()
+    gl.uniformMatrix4fv @material.getUniform('uViewMatrix'), false, camera.getViewMatrix()
+    gl.uniformMatrix3fv @material.getUniform('uNormalMatrix'), false, @normalMatrix
+    @setFloatUniform 'farClip', camera.far
 
 
 

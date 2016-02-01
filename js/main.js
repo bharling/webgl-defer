@@ -147,6 +147,9 @@
       vec3.set(this.scale, 1.0, 1.0, 1.0);
       this.transformDirty = true;
       this.worldTransform = mat4.create();
+      this.worldViewMatrix = mat4.create();
+      this.normalMatrix = mat3.create();
+      this.worldViewProjectionMatrix = mat4.create();
       this.children = [];
       this.visible = true;
     }
@@ -164,6 +167,40 @@
       mat3.getInverse(normalMatrix, viewMatrix);
       mat3.transpose(normalMatrix, normalMatrix);
       return normalMatrix;
+    };
+
+    Object3D.prototype.draw = function(camera) {
+      if (!this.material || !this.loaded) {
+        return;
+      }
+      this.material.use();
+      this.updateWorldTransform();
+      mat4.multiply(this.worldViewMatrix, camera.getViewMatrix(), this.worldTransform);
+      mat3.normalFromMat4(this.normalMatrix, this.worldViewMatrix);
+      this.setMatrixUniforms(camera);
+      this.bindTextures();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
+      return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+    };
+
+    Object3D.prototype.bindTextures = function() {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.material.diffuseMap);
+      gl.uniform1i(this.material.getUniform('diffuseTex'), 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.material.normalMap);
+      return gl.uniform1i(this.material.getUniform('normalTex'), 1);
+    };
+
+    Object3D.prototype.setMatrixUniforms = function(camera) {
+      if (!this.material) {
+        return null;
+      }
+      gl.uniformMatrix4fv(this.material.getUniform('uMVMatrix'), false, this.worldViewMatrix);
+      gl.uniformMatrix4fv(this.material.getUniform('uPMatrix'), false, camera.getProjectionMatrix());
+      gl.uniformMatrix4fv(this.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
+      gl.uniformMatrix3fv(this.material.getUniform('uNormalMatrix'), false, this.normalMatrix);
+      return this.setFloatUniform('farClip', camera.far);
     };
 
     Object3D.prototype.updateWorldTransform = function(parentTransform) {
@@ -386,28 +423,12 @@
       return gl.bindBuffer(gl.ARRAY_BUFFER, null);
     };
 
-    JSONGeometry.prototype.setMatrixUniforms = function(mvMatrix, pMatrix) {
-      if (!this.material) {
-        return null;
-      }
-      gl.uniformMatrix4fv(this.material.getUniform('uMVMatrix'), false, mvMatrix);
-      return gl.uniformMatrix4fv(this.material.getUniform('uPMatrix'), false, pMatrix);
-    };
-
     JSONGeometry.prototype.setFloatUniform = function(name, val) {
       return gl.uniform1f(this.material.getUniform(name), val);
     };
 
     JSONGeometry.prototype.setVec4Uniform = function(name, x, y, z, w) {
       return gl.uniform4f(this.material.getUniform(name), x, y, z, w);
-    };
-
-    JSONGeometry.prototype.draw = function() {
-      if (!this.material || !this.loaded) {
-        return;
-      }
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
-      return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
     };
 
     JSONGeometry.prototype.onDataLoaded = function(data) {
@@ -828,6 +849,17 @@
     return DirectionalLight;
 
   })(DFIR.Object3D);
+
+  DFIR.ShadowCamera = (function(superClass) {
+    extend(ShadowCamera, superClass);
+
+    function ShadowCamera() {
+      return ShadowCamera.__super__.constructor.apply(this, arguments);
+    }
+
+    return ShadowCamera;
+
+  })(DFIR.Camera);
 
   DFIR.Gbuffer = (function() {
     function Gbuffer(resolution) {

@@ -59,12 +59,12 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   release: ->
     gl.bindBuffer gl.ARRAY_BUFFER, null
 
-  setMatrixUniforms: (mvMatrix, pMatrix) ->
-    if !@material
-      return null
-
-    gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, mvMatrix
-    gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, pMatrix
+  #setMatrixUniforms: (mvMatrix, pMatrix) ->
+  #  if !@material
+  #    return null
+  #
+  #  gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, mvMatrix
+  #  gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, pMatrix
 
   setFloatUniform: (name, val) ->
     gl.uniform1f @material.getUniform(name), val
@@ -73,12 +73,12 @@ class DFIR.JSONGeometry extends DFIR.Object3D
     gl.uniform4f @material.getUniform(name), x, y, z, w
 
 
-  draw : ->
-    if !@material or !@loaded
-      return
-
-    gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
-    gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
+  #draw : ->
+  #  if !@material or !@loaded
+  #    return
+  #
+  #  gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
+  #  gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
 
   onDataLoaded: (data) =>
     @vertexPositionBuffer = new DFIR.Buffer( new Float32Array( data.vertexPositions ), 3, gl.STATIC_DRAW )

@@ -13,9 +13,10 @@
 		margin:0;
 	}
 
-
-
-
+	canvas {
+		width:100%;
+		height:100%;
+	}
 </style>
 
 <script type="text/javascript">
@@ -109,52 +110,25 @@
         var radius = 100.0;
 
 
-        //camera.setPosition([ radius * Math.sin(angle), 27.0 * Math.sin(angle*0.5), radius * Math.cos(angle) ]);
+        camera.setPosition([ radius * Math.sin(-angle), 60.0, radius * Math.cos(-angle) ]);
 
         sunLight.setPosition([ radius * Math.sin(angle), 20, radius * Math.cos(angle) ]);
 
         camera.updateViewMatrix();
         //camera.updateProjectionMatrix();
 
-        var viewMatrix = camera.getViewMatrix();
+        //var viewMatrix = camera.getViewMatrix();
 
-        var projectionMatrix = camera.getProjectionMatrix();
+        //var projectionMatrix = camera.getProjectionMatrix();
 
 
         for ( var i=0; i < pots.length; i ++ ) {
         	var pot = pots[i];
 
         	if (pot.bind()) {
-        		pot.material.use();
-	        	var worldMatrix = pot.getWorldTransform();
-	        	var worldViewMatrix = mat4.create(), normalMatrix = mat3.create();
-	        	mat4.multiply( worldViewMatrix, viewMatrix, worldMatrix );
-						mat3.normalFromMat4( normalMatrix, worldViewMatrix );
 
 
-	        	//mat4.toInverseMat3(worldMatrix, normalMatrix);
-	        	//mat3.transpose(normalMatrix);
-
-	        	pot.setMatrixUniforms(worldViewMatrix, camera.getProjectionMatrix());
-
-	        	gl.uniformMatrix3fv(pot.material.getUniform('uNormalMatrix'), false, normalMatrix);
-        		gl.uniformMatrix4fv(pot.material.getUniform('uViewMatrix'), false, viewMatrix);
-
-        		pot.setFloatUniform('farClip', camera.far);
-
-
-	        	// bind textures
-	        	gl.activeTexture(gl.TEXTURE0);
-	        	gl.bindTexture(gl.TEXTURE_2D, pot.material.diffuseMap);
-	        	gl.uniform1i(pot.material.getUniform('diffuseTex'), 0);
-
-
-	        	gl.activeTexture(gl.TEXTURE1);
-	        	gl.bindTexture(gl.TEXTURE_2D, pot.material.normalMap);
-	        	gl.uniform1i(pot.material.getUniform('normalTex'), 1);
-
-
-        		pot.draw();
+        		pot.draw(camera);
         		pot.release();
 
         	}

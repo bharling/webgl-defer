@@ -1,0 +1,1 @@
+class DFIR.ShadowCamera extends DFIR.Camera
