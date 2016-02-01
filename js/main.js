@@ -1,5 +1,5 @@
 (function() {
-  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, pixelsToClip, shader_type_enums,
+  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, pixelsToClip, shader_type_enums,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -144,7 +144,7 @@
     function Object3D() {
       this.position = vec3.create();
       this.scale = vec3.create();
-      this.scale[0] = this.scale[1] = this.scale[2] = 1.0;
+      vec3.set(this.scale, 1.0, 1.0, 1.0);
       this.transformDirty = true;
       this.worldTransform = mat4.create();
       this.children = [];
@@ -158,24 +158,28 @@
       return this.worldTransform;
     };
 
+    Object3D.prototype.getNormalMatrix = function(viewMatrix) {
+      var normalMatrix;
+      normalMatrix = mat3.create();
+      mat3.getInverse(normalMatrix, viewMatrix);
+      mat3.transpose(normalMatrix, normalMatrix);
+      return normalMatrix;
+    };
+
     Object3D.prototype.updateWorldTransform = function(parentTransform) {
       mat4.identity(this.worldTransform);
-      mat4.translate(this.worldTransform, this.position);
-      mat4.scale(this.worldTransform, this.scale);
+      mat4.translate(this.worldTransform, this.worldTransform, this.position);
+      mat4.scale(this.worldTransform, this.worldTransform, this.scale);
       this.transformDirty = false;
     };
 
     Object3D.prototype.setPosition = function(pos) {
-      this.position[0] = pos[0];
-      this.position[1] = pos[1];
-      this.position[2] = pos[2];
+      vec3.copy(this.position, pos);
       return this.transformDirty = true;
     };
 
     Object3D.prototype.setScale = function(s) {
-      this.scale[0] = s[0];
-      this.scale[1] = s[1];
-      this.scale[2] = s[2];
+      vec3.copy(this.scale, s);
       return this.transformDirty = true;
     };
 
@@ -243,12 +247,99 @@
 
   })(DFIR.Object3D);
 
+  mergeVertices = function(vertices, faces) {
+    var changes, i, j, key, precision, precisionPoints, ref, results, unique, v, verticesMap;
+    verticesMap = {};
+    unique = [];
+    changes = [];
+    precisionPoints = 4;
+    precision = Math.pow(10, precisionPoints);
+    results = [];
+    for (i = j = 0, ref = vertices.length; j < ref; i = j += 1) {
+      v = vertices[i];
+      key = (Math.round(v[0] * precision)) + "_" + (Math.round(v[1] * precision)) + "_" + (Math.round(v[2] * precision));
+      if (verticesMap[key] != null) {
+        results.push(changes[i] = changes[verticesMap[key]]);
+      } else {
+        verticesMap[key] = i;
+        unique.push(vertices[i]);
+        results.push(changes[i] = unique.length - 1);
+      }
+    }
+    return results;
+  };
+
+  DFIR.Face = (function() {
+    function Face(a1, b1, c1) {
+      this.a = a1;
+      this.b = b1;
+      this.c = c1;
+    }
+
+    return Face;
+
+  })();
+
+  DFIR.Geometry = (function() {
+    function Geometry() {
+      this.indices = [];
+      this.faces = [];
+      this.vertices = [];
+      this.normals = [];
+      this.texCoords = [[]];
+      this.vertexBuffer = null;
+      this.texCoordBuffers = [];
+      this.indexBuffer = null;
+      this.normalBuffer = null;
+    }
+
+    return Geometry;
+
+  })();
+
+  DFIR.Geometry.meshCache = {};
+
+  DFIR.CubeGeometry = (function(superClass) {
+    extend(CubeGeometry, superClass);
+
+    function CubeGeometry(size, detail) {
+      if (detail == null) {
+        detail = 1;
+      }
+      CubeGeometry.__super__.constructor.call(this);
+    }
+
+    return CubeGeometry;
+
+  })(DFIR.Geometry);
+
+  DFIR.SphereGeometry = (function(superClass) {
+    extend(SphereGeometry, superClass);
+
+    function SphereGeometry(rings) {
+      SphereGeometry.__super__.constructor.call(this);
+    }
+
+    return SphereGeometry;
+
+  })(DFIR.Geometry);
+
   loadJSON = function(url, callback) {
-    var request;
+    var key, request;
+    key = md5(url);
+    console.log(key);
+    if (DFIR.Geometry.meshCache[key] != null) {
+      console.log('Not loading #{url}');
+      callback(DFIR.Geometry.meshCache[key]);
+      return;
+    }
     request = new XMLHttpRequest();
     request.open('GET', url);
     request.onreadystatechange = function() {
+      var result;
       if (request.readyState === 4) {
+        result = JSON.parse(request.responseText);
+        DFIR.Geometry.meshCache[key] = result;
         return callback(JSON.parse(request.responseText));
       }
     };
@@ -651,7 +742,7 @@
       }
       this.target = vec3.create();
       this.fov = 45.0;
-      this.up = vec3.create([0.0, 1.0, 0.0]);
+      this.up = vec3.fromValues(0.0, 1.0, 0.0);
       this.viewMatrix = mat4.create();
       this.near = 0.01;
       this.far = 60.0;
@@ -681,10 +772,10 @@
     Camera.prototype.getFrustumCorners = function() {
       var Cfar, Cnear, Hfar, Hnear, Wfar, Wnear, ar, fov, v, w;
       v = vec3.create();
-      vec3.sub(this.target, this.position, v);
-      vec3.normalize(v);
+      vec3.sub(v, this.target, this.position);
+      vec3.normalize(v, v);
       w = vec3.create();
-      vec3.cross(viewVector, this.up, w);
+      vec3.cross(w, viewVector, this.up);
       fov = this.fov * Math.PI / 180.0;
       ar = this.viewportWidth / this.viewportHeight;
       Hnear = 2 * Math.tan(fov / 2.0) * this.near;
@@ -693,29 +784,29 @@
       Wfar = Hfar * ar;
       Cnear = vec3.create();
       Cfar = vec3.create();
-      vec3.add(this.position, v, Cnear);
-      vec3.scale(Cnear, this.near);
-      vec3.add(this.position, v, Cfar);
-      return vec3.scale(Cfar, this.far);
+      vec3.add(Cnear, this.position, v);
+      vec3.scale(Cnear, Cnear, this.near);
+      vec3.add(Cfar, this.position, v);
+      return vec3.scale(Cfar, Cfar, this.far);
     };
 
     Camera.prototype.getInverseProjectionMatrix = function() {
       var invProjMatrix;
       invProjMatrix = mat4.create();
-      mat4.inverse(this.projectionMatrix, invProjMatrix);
+      mat4.invert(invProjMatrix, this.projectionMatrix);
       return invProjMatrix;
     };
 
     Camera.prototype.updateViewMatrix = function() {
       mat4.identity(this.viewMatrix);
-      return mat4.lookAt(this.position, this.target, this.up, this.viewMatrix);
+      return mat4.lookAt(this.viewMatrix, this.position, this.target, this.up);
     };
 
     Camera.prototype.updateProjectionMatrix = function() {
       var aspect;
       mat4.identity(this.projectionMatrix);
       aspect = this.viewportWidth / this.viewportHeight;
-      return mat4.perspective(this.fov, this.viewportWidth / this.viewportHeight, this.near, this.far, this.projectionMatrix);
+      return mat4.perspective(this.projectionMatrix, this.fov, aspect, this.near, this.far);
     };
 
     return Camera;

@@ -6,11 +6,11 @@ mat3.makeTranslation = (tx, ty) ->
   tm[6] = tx
   tm[7] = ty
   tm
-  
+
 mat3.makeRotation = (radians) ->
   c = Math.cos(radians)
   s = Math.sin(radians)
-  
+
   rm = mat3.create()
   rm.identity()
   rm[0] = c
@@ -36,7 +36,7 @@ mat3.makeProjection = (w, h) ->
   pm[6] = -1
   pm[7] = 1
   pm[8] = 1
-  pm  
+  pm
 
 mat3.makeScale = (sx, sy) ->
   sm = mat3.create()
@@ -44,7 +44,7 @@ mat3.makeScale = (sx, sy) ->
   sm[0] = sx
   sm[4] = sy
   sm
-  
+
 mat3.multiply = (a,b) ->
   # multiply a by b
   a00 = a[0*3+0]
@@ -65,7 +65,7 @@ mat3.multiply = (a,b) ->
   b20 = b[2*3+0]
   b21 = b[2*3+1]
   b22 = b[2*3+2]
-  
+
   ret = mat3.create()
   ret[0] = a00 * b00 + a01 * b10 + a02 * b20
   ret[1] = a00 * b01 + a01 * b11 + a02 * b21
@@ -79,6 +79,9 @@ mat3.multiply = (a,b) ->
   ret
 
 
+
+
+
 # some simple stuff that I should replace later
 
 pixelsToClip = ( pos ) ->
@@ -90,5 +93,3 @@ pixelsToClip = ( pos ) ->
   py -= 1.0
   py *= -1.0
   return [px,py]
-  
-  
