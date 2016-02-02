@@ -143,13 +143,11 @@
   DFIR.Object3D = (function() {
     function Object3D() {
       this.position = vec3.create();
-      this.scale = vec3.create();
-      vec3.set(this.scale, 1.0, 1.0, 1.0);
+      this.scale = vec3.fromValues(1.0, 1.0, 1.0);
+      this.rotation = quat.create();
+      this.transform = mat4.create();
       this.transformDirty = true;
-      this.worldTransform = mat4.create();
-      this.worldViewMatrix = mat4.create();
       this.normalMatrix = mat3.create();
-      this.worldViewProjectionMatrix = mat4.create();
       this.children = [];
       this.visible = true;
     }
@@ -158,26 +156,21 @@
       if (this.transformDirty === true) {
         this.updateWorldTransform();
       }
-      return this.worldTransform;
-    };
-
-    Object3D.prototype.getNormalMatrix = function(viewMatrix) {
-      var normalMatrix;
-      normalMatrix = mat3.create();
-      mat3.getInverse(normalMatrix, viewMatrix);
-      mat3.transpose(normalMatrix, normalMatrix);
-      return normalMatrix;
+      return this.transform;
     };
 
     Object3D.prototype.draw = function(camera) {
+      var worldViewProjectionMatrix;
       if (!this.material || !this.loaded) {
         return;
       }
       this.material.use();
-      this.updateWorldTransform();
-      mat4.multiply(this.worldViewMatrix, camera.getViewMatrix(), this.worldTransform);
-      mat3.normalFromMat4(this.normalMatrix, this.worldViewMatrix);
-      this.setMatrixUniforms(camera);
+      this.update();
+      mat3.normalFromMat4(this.normalMatrix, this.transform);
+      worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
+      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
+      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, this.transform);
+      this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
       return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
@@ -192,21 +185,22 @@
       return gl.uniform1i(this.material.getUniform('normalTex'), 1);
     };
 
-    Object3D.prototype.setMatrixUniforms = function(camera) {
+    Object3D.prototype.setMatrixUniforms = function(wvpMatrix, normalMatrix) {
       if (!this.material) {
         return null;
       }
-      gl.uniformMatrix4fv(this.material.getUniform('uMVMatrix'), false, this.worldViewMatrix);
-      gl.uniformMatrix4fv(this.material.getUniform('uPMatrix'), false, camera.getProjectionMatrix());
-      gl.uniformMatrix4fv(this.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
-      gl.uniformMatrix3fv(this.material.getUniform('uNormalMatrix'), false, this.normalMatrix);
+      gl.uniformMatrix4fv(this.material.getUniform('uWorldViewProjectionMatrix'), false, wvpMatrix);
+      gl.uniformMatrix3fv(this.material.getUniform('uNormalMatrix'), false, normalMatrix);
       return this.setFloatUniform('farClip', camera.far);
     };
 
     Object3D.prototype.updateWorldTransform = function(parentTransform) {
-      mat4.identity(this.worldTransform);
-      mat4.translate(this.worldTransform, this.worldTransform, this.position);
-      mat4.scale(this.worldTransform, this.worldTransform, this.scale);
+      if (parentTransform == null) {
+        parentTransform = null;
+      }
+      mat4.identity(this.transform);
+      mat4.translate(this.transform, this.transform, this.position);
+      mat4.scale(this.transform, this.transform, this.scale);
       this.transformDirty = false;
     };
 
@@ -217,6 +211,26 @@
 
     Object3D.prototype.setScale = function(s) {
       vec3.copy(this.scale, s);
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.translate = function(vec) {
+      vec3.translate(this.position, vec);
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.rotateX = function(rad) {
+      quat.rotateX(this.rotation, this.rotation, rad);
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.rotateY = function(rad) {
+      quat.rotateY(this.rotation, this.rotation, rad);
+      return this.transformDirty = true;
+    };
+
+    Object3D.prototype.rotateZ = function(rad) {
+      quat.rotateZ(this.rotation, this.rotation, rad);
       return this.transformDirty = true;
     };
 
@@ -237,7 +251,7 @@
 
     Object3D.prototype.update = function() {
       if (this.transformDirty) {
-        mat4.fromRotationTranslation(this.transform, this.rotationQuaternion, this.position);
+        mat4.fromRotationTranslationScale(this.transform, this.rotation, this.position, this.scale);
         return this.transformDirty = false;
       }
     };
@@ -478,6 +492,79 @@
     }
     return shader;
   };
+
+  DFIR.Uniform = (function() {
+    function Uniform(name1, shaderProgram1) {
+      this.name = name1;
+      this.shaderProgram = shaderProgram1;
+      this.location = gl.getUniformLocation(this.shaderProgram, this.name);
+    }
+
+    Uniform.prototype.setValue = function(value) {};
+
+    return Uniform;
+
+  })();
+
+  DFIR.UniformMat4 = (function(superClass) {
+    extend(UniformMat4, superClass);
+
+    function UniformMat4() {
+      return UniformMat4.__super__.constructor.apply(this, arguments);
+    }
+
+    UniformMat4.prototype.setValue = function(matrix) {
+      return gl.uniformMatrix4fv(this.location, false, matrix);
+    };
+
+    return UniformMat4;
+
+  })(DFIR.Uniform);
+
+  DFIR.UniformFloat = (function(superClass) {
+    extend(UniformFloat, superClass);
+
+    function UniformFloat() {
+      return UniformFloat.__super__.constructor.apply(this, arguments);
+    }
+
+    UniformFloat.prototype.setValue = function(value) {
+      return gl.uniform1f(this.location, value);
+    };
+
+    return UniformFloat;
+
+  })(DFIR.Uniform);
+
+  DFIR.UniformMat3 = (function(superClass) {
+    extend(UniformMat3, superClass);
+
+    function UniformMat3() {
+      return UniformMat3.__super__.constructor.apply(this, arguments);
+    }
+
+    UniformMat3.prototype.setValue = function(matrix) {
+      return gl.uniformMatrix3fv(this.location, false, matrix);
+    };
+
+    return UniformMat3;
+
+  })(DFIR.Uniform);
+
+  DFIR.UniformVec3 = (function(superClass) {
+    extend(UniformVec3, superClass);
+
+    function UniformVec3() {
+      return UniformVec3.__super__.constructor.apply(this, arguments);
+    }
+
+    UniformVec3.prototype.setValue = function(vec) {
+      return gl.uniform3fv(this.location, 3, vec);
+    };
+
+    return UniformVec3;
+
+  })(DFIR.Uniform);
 
   DFIR.ShaderSource = (function() {
     function ShaderSource(vertexSource1, fragmentSource1) {
@@ -1088,3 +1175,5 @@
   })();
 
 }).call(this);
+
+//# sourceMappingURL=main.js.map

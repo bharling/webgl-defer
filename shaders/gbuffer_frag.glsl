@@ -79,7 +79,7 @@
 	//}
 
   void main (void) {
-    vec3 N = normalize(vNormal);
+    vec3 N = normalize(uNormalMatrix * vNormal);
 
     N = perturb_normal(N, vEyeDirection, vTexCoords );
 

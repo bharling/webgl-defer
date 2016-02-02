@@ -21,10 +21,16 @@ module.exports = (grunt) ->
 
   grunt.initConfig
     coffee:
+      options:
+        join: true
+      
       develop:
         options:
-          join:true
-        files: 'js/main.js' : coffeeFiles
+          sourceMap: true
+        files:
+          'js/main.js' : coffeeFiles
+
+
 
     watch:
       options:

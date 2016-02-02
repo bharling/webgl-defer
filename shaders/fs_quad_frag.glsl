@@ -162,11 +162,11 @@
 
 
 
-    lin += sky*vec3(0.16,0.20,0.28);
+    //lin += sky*vec3(0.16,0.20,0.28);
 
     lin += ind*vec3(0.40,0.28,0.20) * 0.2;
 
-    lin += specularColor * specVal;
+    //lin += specularColor * specVal;
 
     vec3 color = matColor * lin;
 

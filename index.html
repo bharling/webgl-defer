@@ -24,6 +24,8 @@
     var gl, deriv_ext, half_ext;
     function initGL(canvas) {
         try {
+        	canvas.width = 1280;
+        	canvas.height = 720;
             gl = canvas.getContext("webgl");
             gl.viewportWidth = canvas.width;
             gl.viewportHeight = canvas.height;
@@ -95,6 +97,15 @@
 	}
 
 
+	function updateScene( timeSinceLastFrame ) {
+		rTri += 0.05 * timeSinceLastFrame;
+		pots[1].rotateY( 0.005 * timeSinceLastFrame);
+		pots[2].rotateY( -0.003 * timeSinceLastFrame );
+		var angle = degToRad(rTri);
+        var radius = 100.0;
+        camera.setPosition([ radius * Math.sin(-angle), 60.0, radius * Math.cos(-angle) ]);
+        sunLight.setPosition([ radius * Math.sin(angle*1.5), 20, radius * Math.cos(angle*1.5) ]);
+	}
 
     function drawScene() {
 
@@ -106,16 +117,10 @@
     	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
     	gl.enable(gl.CULL_FACE);
 
-        var angle = degToRad(rTri);
-        var radius = 100.0;
-
-
-        camera.setPosition([ radius * Math.sin(-angle), 60.0, radius * Math.cos(-angle) ]);
-
-        sunLight.setPosition([ radius * Math.sin(angle), 20, radius * Math.cos(angle) ]);
+        
 
         camera.updateViewMatrix();
-        //camera.updateProjectionMatrix();
+        camera.updateProjectionMatrix();
 
         //var viewMatrix = camera.getViewMatrix();
 
@@ -201,31 +206,26 @@
 
     }
 
-	var lastTime = 0;
-	function animate() {
-		var now = new Date().getTime();
-		if (lastTime != 0) {
-			elapsed = now - lastTime;
+	var lastTime = 0, elapsed = 0;
 
-			rTri += (90*elapsed) / 1000.0;
-			rSquare += (75*elapsed) / 1000.0;
-		}
-
-		lastTime = now;
-	}
 
 
 	function tick () {
 		requestAnimationFrame(tick);
+		var now = new Date().getTime();
+		if (lastTime != 0) {
+			elapsed = now - lastTime;
+		}
+		updateScene( elapsed );
 		drawScene();
-		animate();
+		lastTime = now;
 	}
 
 	var teapot, quad, camera, debug_grid, debug_material;
 	var pots = [];
 
-	var pots_per_side = 5;
-	var pots_half = 30.0 * pots_per_side / 2;
+	var pots_per_side = 2;
+	var pots_half = 30.0 * (pots_per_side / 2);
 
 	function loadModel () {
 
@@ -238,12 +238,14 @@
 				   pot.setMaterial(mat);
 				   pot.material.setDiffuseMap('textures/diffuse.jpg');
 				   pot.material.setNormalMap('textures/normals.png');
-				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 25.0) ]);
+				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 30.0) ]);
 
 				   //pot.setScale([0.5,0.5,0.5]);
 				   pots.push(pot);
 				}
 			}
+
+			pots[1].setScale([1.2, 1.2, 1.2]);
 		});
 
 		DFIR.ShaderLoader.load( 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', function (program) {
@@ -259,7 +261,7 @@
 		});
 
 		camera = new DFIR.Camera(gbuffer.width, gbuffer.height);
-		camera.setPosition(vec3.fromValues( 0.0, 40.0, -200.0 ));
+		camera.setPosition(vec3.fromValues( 0.0, 40.0, -100.0 ));
 		camera.setNearClip(1.0);
 		camera.setFarClip(500.0);
 		sunLight = new DFIR.DirectionalLight(vec3.fromValues(0.0, 1.0, 0.5));

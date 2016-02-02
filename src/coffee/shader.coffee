@@ -26,6 +26,30 @@ getShader = (id) ->
     return null
   return shader
   
+
+
+class DFIR.Uniform
+  constructor: (@name, @shaderProgram) ->
+    @location = gl.getUniformLocation @shaderProgram, @name
+
+  setValue: (value) ->
+
+class DFIR.UniformMat4 extends DFIR.Uniform
+  setValue: (matrix) ->
+    gl.uniformMatrix4fv @location, false, matrix
+
+class DFIR.UniformFloat extends DFIR.Uniform
+  setValue: (value) ->
+    gl.uniform1f @location, value
+
+class DFIR.UniformMat3 extends DFIR.Uniform
+  setValue: (matrix) ->
+    gl.uniformMatrix3fv @location, false, matrix
+
+class DFIR.UniformVec3 extends DFIR.Uniform
+  setValue: (vec) ->
+    gl.uniform3fv @location, 3, vec
+
   
 class DFIR.ShaderSource
   constructor: (@vertexSource, @fragmentSource) ->
