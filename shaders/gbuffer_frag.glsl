@@ -46,14 +46,14 @@
   }
 
   vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ) {
-    // assume N, the interpolated vertex normal and 
+    // assume N, the interpolated vertex normal and
     // V, the view vector (vertex to eye)
     vec3 map = texture2D( normalTex, texcoord ).xyz;
 //#ifdef WITH_NORMALMAP_UNSIGNED
     map = map * 255./127. - 128./127.;
 //#endif
 //#ifdef WITH_NORMALMAP_2CHANNEL
-//    map.z = sqrt( 1. - dot( map.xy, map.xy ) );
+    map.z = sqrt( 1. - dot( map.xy, map.xy ) );
 //#endif
 //#ifdef WITH_NORMALMAP_GREEN_UP
 //     map.y = -map.y;

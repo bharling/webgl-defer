@@ -56,6 +56,20 @@ class DFIR.Geometry
 
 DFIR.Geometry.meshCache = {}
 
+class DFIR.Plane extends DFIR.Geometry
+  constructor: (size, detail=1) ->
+    hs = size / 2
+    @vertices = [
+      -hs, 0, 0,
+      hs, 0, 0,
+      hs, 0, hs,
+      -hs, 0, hs
+    ]
+
+    @indexes = [
+      
+    ]
+
 class DFIR.CubeGeometry extends DFIR.Geometry
   constructor: (size, detail=1) ->
     super()

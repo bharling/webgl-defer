@@ -1,7 +1,7 @@
 <html>
 
 <head>
-<title>Learning WebGL &mdash; lesson 1</title>
+<title>DFIR Engine - Demo</title>
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
 <script type="text/javascript" src="js/glMatrix.min.js"></script>
@@ -101,9 +101,12 @@
 		rTri += 0.05 * timeSinceLastFrame;
 		pots[1].rotateY( 0.005 * timeSinceLastFrame);
 		pots[2].rotateY( -0.003 * timeSinceLastFrame );
+
+		camera.update();
+
 		var angle = degToRad(rTri);
-        var radius = 100.0;
-        camera.setPosition([ radius * Math.sin(-angle), 60.0, radius * Math.cos(-angle) ]);
+        var radius = 30.0;
+        //camera.setPosition([ radius * Math.sin(-angle), 20.0, radius * Math.cos(-angle) ]);
         sunLight.setPosition([ radius * Math.sin(angle*1.5), 20, radius * Math.cos(angle*1.5) ]);
 	}
 
@@ -117,7 +120,7 @@
     	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
     	gl.enable(gl.CULL_FACE);
 
-        
+
 
         camera.updateViewMatrix();
         camera.updateProjectionMatrix();
@@ -237,7 +240,7 @@
 				   pot = new DFIR.JSONGeometry('models/teapot.json');
 				   pot.setMaterial(mat);
 				   pot.material.setDiffuseMap('textures/diffuse.jpg');
-				   pot.material.setNormalMap('textures/normals.png');
+				   pot.material.setNormalMap('textures/sci_fi_derivative.jpg');
 				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 30.0) ]);
 
 				   //pot.setScale([0.5,0.5,0.5]);
@@ -259,11 +262,11 @@
 			debug_grid = new DFIR.DebugGridView(6);
 			debug_material = new DFIR.Shader ( program );
 		});
-
-		camera = new DFIR.Camera(gbuffer.width, gbuffer.height);
-		camera.setPosition(vec3.fromValues( 0.0, 40.0, -100.0 ));
+		var canvas = document.getElementById("canvas");
+		camera = new DFIR.FPSCamera(gbuffer.width, gbuffer.height, canvas);
+		camera.setPosition(vec3.fromValues( 0.0, -80.0, -100.0 ));
 		camera.setNearClip(1.0);
-		camera.setFarClip(500.0);
+		camera.setFarClip(600.0);
 		sunLight = new DFIR.DirectionalLight(vec3.fromValues(0.0, 1.0, 0.5));
 
 
@@ -273,6 +276,7 @@
 	var gbuffer;
 
     function webGLStart() {
+
         var canvas = document.getElementById("canvas");
         initGL(canvas);
 

@@ -1,5 +1,5 @@
 (function() {
-  var DebugView, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, pixelsToClip, shader_type_enums,
+  var DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader_type_enums, value,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -349,6 +349,23 @@
   })();
 
   DFIR.Geometry.meshCache = {};
+
+  DFIR.Plane = (function(superClass) {
+    extend(Plane, superClass);
+
+    function Plane(size, detail) {
+      var hs;
+      if (detail == null) {
+        detail = 1;
+      }
+      hs = size / 2;
+      this.vertices = [-hs, 0, 0, hs, 0, 0, hs, 0, hs, -hs, 0, hs];
+      this.indexes = [];
+    }
+
+    return Plane;
+
+  })(DFIR.Geometry);
 
   DFIR.CubeGeometry = (function(superClass) {
     extend(CubeGeometry, superClass);
@@ -835,6 +852,86 @@
 
   })();
 
+  InertialValue = (function() {
+    function InertialValue(value1, damping, dt1) {
+      this.value = value1;
+      this.dt = dt1;
+      console.log(this.dt);
+      this.damping = Math.pow(damping, this.dt);
+      this.last = this.value;
+      this.display = this.value;
+      this.velocity = 0;
+    }
+
+    InertialValue.prototype.accelerate = function(acceleration) {
+      this.velocity += acceleration * this.dt;
+      return console.log(this.velocity);
+    };
+
+    InertialValue.prototype.integrate = function() {
+      this.velocity *= this.damping;
+      this.last = this.value;
+      return this.value += this.velocity * this.dt;
+    };
+
+    InertialValue.prototype.interpolate = function(f) {
+      return this.display = this.last * f + (1 - f) * this.value;
+    };
+
+    InertialValue.prototype.get = function() {
+      return this.display;
+    };
+
+    InertialValue.prototype.set = function(value1) {
+      this.value = value1;
+      return this.last = this.value;
+    };
+
+    return InertialValue;
+
+  })();
+
+  InertialVector = (function() {
+    function InertialVector(x, y, z, damping, dt) {
+      this.x = new InertialValue(x, damping, dt);
+      this.y = new InertialValue(y, damping, dt);
+      this.z = new InertialValue(z, damping, dt);
+    }
+
+    InertialVector.prototype.accelerate = function(x, y, z) {
+      this.x.accelerate(x);
+      this.y.accelerate(y);
+      return this.z.accelerate(z);
+    };
+
+    InertialVector.prototype.integrate = function() {
+      this.x.integrate();
+      this.y.integrate();
+      return this.z.integrate();
+    };
+
+    InertialVector.prototype.interpolate = function(f) {
+      this.x.interpolate(f);
+      this.y.interpolate(f);
+      return this.z.interpolate(f);
+    };
+
+    InertialVector.prototype.set = function(x, y, z) {
+      if (x instanceof Array) {
+        this.x.set(x[0]);
+        this.y.set(x[1]);
+        return this.z.set(x[2]);
+      } else {
+        this.x.set(x);
+        this.y.set(y);
+        return this.z.set(z);
+      }
+    };
+
+    return InertialVector;
+
+  })();
+
   DFIR.Camera = (function(superClass) {
     extend(Camera, superClass);
 
@@ -854,9 +951,9 @@
       this.viewMatrix = mat4.create();
       this.near = 0.01;
       this.far = 60.0;
-      this.updateViewMatrix();
       this.projectionMatrix = mat4.create();
       this.updateProjectionMatrix();
+      this.updateViewMatrix();
     }
 
     Camera.prototype.setFarClip = function(far) {
@@ -920,6 +1017,181 @@
     return Camera;
 
   })(DFIR.Object3D);
+
+  Pointer = (function() {
+    function Pointer(element, onMove) {
+      this.element = element;
+      this.mouseMove = bind(this.mouseMove, this);
+      this.mouseUp = bind(this.mouseUp, this);
+      this.mouseDown = bind(this.mouseDown, this);
+      this.onMove = onMove != null ? onMove : function() {
+        return null;
+      };
+      this.pressed = false;
+      this.x = null;
+      this.y = null;
+      this.element.addEventListener('mousedown', this.mouseDown);
+      this.element.addEventListener('mouseup', this.mouseUp);
+      this.element.addEventListener('mousemove', this.mouseMove);
+    }
+
+    Pointer.prototype.mouseDown = function(event) {
+      return this.pressed = true;
+    };
+
+    Pointer.prototype.mouseUp = function(event) {
+      return this.pressed = false;
+    };
+
+    Pointer.prototype.mouseMove = function(event) {
+      var dx, dy, rect, x, y;
+      rect = this.element.getBoundingClientRect();
+      x = event.clientX - rect.left;
+      y = event.clientY - rect.top;
+      if (this.x != null) {
+        dx = this.x - x;
+        dy = this.y - y;
+      } else {
+        dx = 0;
+        dy = 0;
+      }
+      this.x = x;
+      this.y = y;
+      return this.onMove(this.x, this.y, dx, dy);
+    };
+
+    return Pointer;
+
+  })();
+
+  keymap = {
+    87: 'w',
+    65: 'a',
+    83: 's',
+    68: 'd',
+    81: 'q',
+    69: 'e',
+    37: 'left',
+    39: 'right',
+    38: 'up',
+    40: 'down',
+    13: 'enter',
+    27: 'esc',
+    32: 'space',
+    8: 'backspace',
+    16: 'shift',
+    17: 'ctrl',
+    18: 'alt',
+    91: 'start',
+    0: 'altc',
+    20: 'caps',
+    9: 'tab',
+    49: 'key1',
+    50: 'key2',
+    51: 'key3',
+    52: 'key4'
+  };
+
+  keys = {};
+
+  for (value in keymap) {
+    name = keymap[value];
+    keys[name] = false;
+  }
+
+  document.addEventListener('keydown', function(event) {
+    name = keymap[event.keyCode];
+    return keys[name] = true;
+  });
+
+  document.addEventListener('keyup', function(event) {
+    name = keymap[event.keyCode];
+    return keys[name] = false;
+  });
+
+  DFIR.FPSCamera = (function(superClass) {
+    extend(FPSCamera, superClass);
+
+    function FPSCamera(viewportWidth, viewportHeight, canvas) {
+      this.viewportWidth = viewportWidth;
+      this.viewportHeight = viewportHeight;
+      this.canvas = canvas;
+      this.pointerMove = bind(this.pointerMove, this);
+      FPSCamera.__super__.constructor.call(this);
+      this.origin = vec3.create();
+      this.rotation = 0;
+      this.pitch = 0;
+      this.rotVec = vec3.create();
+      this.pointer = new Pointer(this.canvas, this.pointerMove);
+      this.dt = 1 / 24;
+      this.position = new InertialVector(0, 0, 0, 0.05, this.dt);
+      this.time = performance.now() / 1000;
+    }
+
+    FPSCamera.prototype.setPosition = function(vec) {
+      this.position.set(vec[0], vec[1], vec[2]);
+      return console.log(this.position);
+    };
+
+    FPSCamera.prototype.pointerMove = function(x, y, dx, dy) {
+      if (this.pointer.pressed) {
+        this.rotation -= dx * 0.01;
+        return this.pitch -= dy * 0.01;
+      }
+    };
+
+    FPSCamera.prototype.step = function() {
+      var f, now;
+      now = performance.now() / 1000;
+      while (this.time < now) {
+        this.time += this.dt;
+        this.position.integrate();
+      }
+      f = (this.time - now) / this.dt;
+      return this.position.interpolate(f);
+    };
+
+    FPSCamera.prototype.cameraAcceleration = function() {
+      var acc;
+      acc = 100;
+      vec3.set(this.rotVec, acc, 0, 0);
+      vec3.rotateY(this.rotVec, this.rotVec, this.rotVec, -this.rotation);
+      if (keys.a) {
+        this.position.accelerate(-this.rotVec[0], -this.rotVec[1], -this.rotVec[2]);
+      }
+      if (keys.d) {
+        this.position.accelerate(this.rotVec[0], this.rotVec[1], this.rotVec[2]);
+      }
+      vec3.set(this.rotVec, 0, 0, acc);
+      vec3.rotateY(this.rotVec, this.rotVec, this.rotVec, -this.rotation);
+      if (keys.w) {
+        this.position.accelerate(-this.rotVec[0], -this.rotVec[1], -this.rotVec[2]);
+      }
+      if (keys.s) {
+        return this.position.accelerate(this.rotVec[0], this.rotVec[1], this.rotVec[2]);
+      }
+    };
+
+    FPSCamera.prototype.update = function() {
+      this.cameraAcceleration();
+      return this.step();
+    };
+
+    FPSCamera.prototype.updateViewMatrix = function() {
+      var pos;
+      mat4.identity(this.viewMatrix);
+      mat4.rotateX(this.viewMatrix, this.viewMatrix, this.pitch);
+      mat4.rotateY(this.viewMatrix, this.viewMatrix, this.rotation);
+      if (this.position.x) {
+        pos = vec3.fromValues(this.position.x.display, this.position.y.display, this.position.z.display);
+        console.log(pos);
+        return mat4.translate(this.viewMatrix, this.viewMatrix, pos);
+      }
+    };
+
+    return FPSCamera;
+
+  })(DFIR.Camera);
 
   DFIR.DirectionalLight = (function(superClass) {
     extend(DirectionalLight, superClass);
