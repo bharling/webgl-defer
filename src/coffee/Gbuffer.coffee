@@ -73,11 +73,11 @@ class DFIR.Gbuffer
 
   bind: ->
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
-    gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
+    #gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
 
 
   release : ->
-    gl.bindTexture gl.TEXTURE_2D, null
+    #gl.bindTexture gl.TEXTURE_2D, null
     gl.bindFramebuffer gl.FRAMEBUFFER, null
     
     

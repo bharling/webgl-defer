@@ -1,5 +1,6 @@
 class DFIR.Renderer
 	constructor: (canvas) ->
+		@ready = false
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
 		if !canvas?
@@ -12,7 +13,18 @@ class DFIR.Renderer
 		gl.viewportWidth = canvas.width
 		gl.viewportHeight = canvas.height
 		@canvas = canvas
+		@gbuffer = new DFIR.Gbuffer(1.0)
+		@createTargets()
 		@setDefaults()
+
+
+
+	createTargets: () ->
+		DFIR.ShaderLoader.load 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (program) =>
+			@quad = new DFIR.FullscreenQuad()
+			@quad.setMaterial ( new DFIR.Shader ( program ))
+			@quad.material.showInfo()
+			@ready = true
 
 
 	setDefaults: () ->
@@ -25,13 +37,23 @@ class DFIR.Renderer
 		gl.blendFunc gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA
 		gl.enable gl.CULL_FACE
 
+
+	enableGBuffer: (scene, camera) ->
+		@gbuffer.bind()
+		gl.cullFace ( gl.BACK ) 
+		gl.blendFunc( gl.ONE, gl.ZERO )
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT )
+		gl.enable(gl.CULL_FACE)
+		
+
 	draw : (scene, camera) ->
-		viewMatrix = camera.getViewMatrix()
-		projectionMatrix = camera.getProjectionMatrix()
+		if @ready
+			viewMatrix = camera.getViewMatrix()
+			projectionMatrix = camera.getProjectionMatrix()
 
-		for material in scene.materials
-			material.use()
-			for obj in material.objects
-				obj.draw()
+			for material in scene.materials
+				material.use()
+				for obj in material.objects
+					obj.draw()
 
-			material.stopUsing()
+				material.stopUsing()

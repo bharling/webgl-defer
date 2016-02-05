@@ -18,7 +18,6 @@ loadJSON = (url, callback) ->
 
 
 
-
 class DFIR.JSONGeometry extends DFIR.Object3D
   constructor: (url) ->
     super()

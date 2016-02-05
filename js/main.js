@@ -1,12 +1,48 @@
+
+/*
+ * @fileoverview DFIR Engine - Deferred WebGL render engine
+ * @author Ben Harling
+ * @version 0.7
+ *
+
+Copyright (c) 2016, Ben Harling
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+ */
+
 (function() {
-  var DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader_type_enums, value,
+  var DFIR, DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader_type_enums, value,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   exports = typeof exports !== 'undefined' ? exports : window;
 
-  exports.DFIR = {};
+  DFIR = {};
+
+  DFIR.currentId = 0;
+
+  DFIR.nextId = function() {
+    return DFIR.currentId++;
+  };
+
+  exports.DFIR = DFIR;
 
   mat3.makeTranslation = function(tx, ty) {
     var tm;
@@ -852,6 +888,100 @@
 
   })();
 
+  loadJSON = function(url, callback) {
+    var key, request;
+    key = md5(url);
+    console.log(key);
+    if (DFIR.Geometry.meshCache[key] != null) {
+      console.log('Not loading #{url}');
+      callback(DFIR.Geometry.meshCache[key]);
+      return;
+    }
+    request = new XMLHttpRequest();
+    request.open('GET', url);
+    request.onreadystatechange = function() {
+      var result;
+      if (request.readyState === 4) {
+        result = JSON.parse(request.responseText);
+        DFIR.Geometry.meshCache[key] = result;
+        return callback(JSON.parse(request.responseText));
+      }
+    };
+    return request.send();
+  };
+
+  DFIR.Resource = (function() {
+    function Resource(url1) {
+      this.url = url1 != null ? url1 : null;
+      this.id = DFIR.nextId();
+    }
+
+    Resource.prototype.load = function() {};
+
+    Resource.prototype.unload = function() {};
+
+    Resource.prototype.bind = function() {};
+
+    return Resource;
+
+  })();
+
+  DFIR.ModelResource = (function(superClass) {
+    extend(ModelResource, superClass);
+
+    function ModelResource(url1) {
+      this.url = url1;
+      this.onDataLoaded = bind(this.onDataLoaded, this);
+      ModelResource.__super__.constructor.call(this);
+      loadJSON(this.url, this.onDataLoaded);
+    }
+
+    ModelResource.prototype.setMaterial = function(shader) {
+      return this.material = shader;
+    };
+
+    ModelResource.prototype.onDataLoaded = function(data) {
+      this.vertexPositionBuffer = new DFIR.Buffer(new Float32Array(data.vertexPositions), 3, gl.STATIC_DRAW);
+      this.vertexTextureCoordBuffer = new DFIR.Buffer(new Float32Array(data.vertexTextureCoords), 2, gl.STATIC_DRAW);
+      this.vertexNormalBuffer = new DFIR.Buffer(new Float32Array(data.vertexNormals), 3, gl.STATIC_DRAW);
+      this.vertexIndexBuffer = new DFIR.Buffer(new Uint16Array(data.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
+      return this.loaded = true;
+    };
+
+    ModelResource.prototype.ready = function() {
+      return this.ready || (this.ready = (this.loaded && this.material && this.material.ready) != null);
+    };
+
+    ModelResource.prototype.bind = function() {
+      var normalsAttrib, positionAttrib, texCoordsAttrib;
+      if (!this.ready()) {
+        return false;
+      }
+      this.material.use();
+      positionAttrib = this.material.getAttribute('aVertexPosition');
+      texCoordsAttrib = this.material.getAttribute('aVertexTextureCoords');
+      normalsAttrib = this.material.getAttribute('aVertexNormal');
+      gl.enableVertexAttribArray(positionAttrib);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer.get());
+      gl.vertexAttribPointer(positionAttrib, this.vertexPositionBuffer.itemSize, gl.FLOAT, false, 12, 0);
+      gl.enableVertexAttribArray(texCoordsAttrib);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTextureCoordBuffer.get());
+      gl.vertexAttribPointer(texCoordsAttrib, this.vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 8, 0);
+      gl.enableVertexAttribArray(normalsAttrib);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer.get());
+      gl.vertexAttribPointer(normalsAttrib, this.vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0);
+      return true;
+      return {
+        release: function() {
+          return gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        }
+      };
+    };
+
+    return ModelResource;
+
+  })(DFIR.Resource);
+
   InertialValue = (function() {
     function InertialValue(value1, damping, dt1) {
       this.value = value1;
@@ -1112,10 +1242,10 @@
   DFIR.FPSCamera = (function(superClass) {
     extend(FPSCamera, superClass);
 
-    function FPSCamera(viewportWidth, viewportHeight, canvas) {
+    function FPSCamera(viewportWidth, viewportHeight, canvas1) {
       this.viewportWidth = viewportWidth;
       this.viewportHeight = viewportHeight;
-      this.canvas = canvas;
+      this.canvas = canvas1;
       this.pointerMove = bind(this.pointerMove, this);
       FPSCamera.__super__.constructor.call(this);
       this.origin = vec3.create();
@@ -1271,12 +1401,10 @@
     };
 
     Gbuffer.prototype.bind = function() {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-      return gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      return gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
     };
 
     Gbuffer.prototype.release = function() {
-      gl.bindTexture(gl.TEXTURE_2D, null);
       return gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     };
 
@@ -1442,6 +1570,92 @@
     DebugView.prototype.createQuad = function(x, y, w, h) {};
 
     return DebugView;
+
+  })();
+
+  DFIR.Scene = (function(superClass) {
+    extend(Scene, superClass);
+
+    function Scene() {
+      return Scene.__super__.constructor.apply(this, arguments);
+    }
+
+    return Scene;
+
+  })(DFIR.Object3D);
+
+  DFIR.Renderer = (function() {
+    function Renderer(canvas) {
+      this.ready = false;
+      this.width = canvas ? canvas.width : 1280;
+      this.height = canvas ? canvas.height : 720;
+      if (canvas == null) {
+        canvas = document.createElement('canvas');
+        document.body.appendChild(canvas);
+      }
+      canvas.width = this.width;
+      canvas.height = this.height;
+      DFIR.gl = window.gl = canvas.getContext("webgl");
+      gl.viewportWidth = canvas.width;
+      gl.viewportHeight = canvas.height;
+      this.canvas = canvas;
+      this.gbuffer = new DFIR.Gbuffer(1.0);
+      this.createTargets();
+      this.setDefaults();
+    }
+
+    Renderer.prototype.createTargets = function() {
+      return DFIR.ShaderLoader.load('shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (function(_this) {
+        return function(program) {
+          _this.quad = new DFIR.FullscreenQuad();
+          _this.quad.setMaterial(new DFIR.Shader(program));
+          _this.quad.material.showInfo();
+          return _this.ready = true;
+        };
+      })(this));
+    };
+
+    Renderer.prototype.setDefaults = function() {
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      gl.depthMask(true);
+      gl.clearDepth(1.0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      return gl.enable(gl.CULL_FACE);
+    };
+
+    Renderer.prototype.enableGBuffer = function(scene, camera) {
+      this.gbuffer.bind();
+      gl.cullFace(gl.BACK);
+      gl.blendFunc(gl.ONE, gl.ZERO);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      return gl.enable(gl.CULL_FACE);
+    };
+
+    Renderer.prototype.draw = function(scene, camera) {
+      var j, l, len, len1, material, obj, projectionMatrix, ref, ref1, results, viewMatrix;
+      if (this.ready) {
+        viewMatrix = camera.getViewMatrix();
+        projectionMatrix = camera.getProjectionMatrix();
+        ref = scene.materials;
+        results = [];
+        for (j = 0, len = ref.length; j < len; j++) {
+          material = ref[j];
+          material.use();
+          ref1 = material.objects;
+          for (l = 0, len1 = ref1.length; l < len1; l++) {
+            obj = ref1[l];
+            obj.draw();
+          }
+          results.push(material.stopUsing());
+        }
+        return results;
+      }
+    };
+
+    return Renderer;
 
   })();
 

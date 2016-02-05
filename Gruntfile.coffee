@@ -3,20 +3,23 @@ module.exports = (grunt) ->
   coffeeFiles = [
 
     'src/coffee/intro.coffee',
-    'src/coffee/renderer.coffee',
+    
     'src/coffee/math.coffee',
-    'src/coffee/buffer.coffee' ,
+    'src/coffee/buffer.coffee',
     'src/coffee/object.coffee',
     'src/coffee/geometry.coffee',
     'src/coffee/json_model.coffee' ,
     'src/coffee/shader.coffee',
+    'src/coffee/resource.coffee',
     'src/coffee/camera.coffee',
 
     'src/coffee/lights.coffee',
     'src/coffee/shadows.coffee',
     'src/coffee/Gbuffer.coffee',
     'src/coffee/fullscreenQuad.coffee',
-    'src/coffee/debug_view.coffee']
+    'src/coffee/debug_view.coffee',
+    'src/coffee/scene.coffee',
+    'src/coffee/renderer.coffee',]
 
 
 
@@ -31,6 +34,15 @@ module.exports = (grunt) ->
         files:
           'js/main.js' : coffeeFiles
 
+
+    uglify:
+      production:
+        options:
+          compress:true
+          preserveComments:'all'
+          
+        files:
+          'js/dfir.min.js': 'js/main.js'
 
 
     watch:
@@ -54,5 +66,6 @@ module.exports = (grunt) ->
     grunt.loadNpmTasks 'grunt-contrib-coffee'
     grunt.loadNpmTasks 'grunt-newer'
     grunt.loadNpmTasks 'grunt-contrib-watch'
+    grunt.loadNpmTasks 'grunt-contrib-uglify'
 
     grunt.registerTask 'default', ['coffee:develop']
