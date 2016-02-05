@@ -8,7 +8,7 @@ class DFIR.Renderer
 
 		canvas.width = @width
 		canvas.height = @height
-		window.gl = canvas.getContext("webgl")
+		DFIR.gl = window.gl = canvas.getContext("webgl")
 		gl.viewportWidth = canvas.width
 		gl.viewportHeight = canvas.height
 		@canvas = canvas
@@ -29,9 +29,9 @@ class DFIR.Renderer
 		viewMatrix = camera.getViewMatrix()
 		projectionMatrix = camera.getProjectionMatrix()
 
-		for material in scene.materials:
+		for material in scene.materials
 			material.use()
-			for obj in material.objects:
+			for obj in material.objects
 				obj.draw()
 
 			material.stopUsing()

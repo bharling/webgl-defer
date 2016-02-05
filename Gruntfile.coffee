@@ -3,6 +3,7 @@ module.exports = (grunt) ->
   coffeeFiles = [
 
     'src/coffee/intro.coffee',
+    'src/coffee/renderer.coffee',
     'src/coffee/math.coffee',
     'src/coffee/buffer.coffee' ,
     'src/coffee/object.coffee',
@@ -23,7 +24,7 @@ module.exports = (grunt) ->
     coffee:
       options:
         join: true
-      
+
       develop:
         options:
           sourceMap: true

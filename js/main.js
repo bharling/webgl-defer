@@ -1184,7 +1184,6 @@
       mat4.rotateY(this.viewMatrix, this.viewMatrix, this.rotation);
       if (this.position.x) {
         pos = vec3.fromValues(this.position.x.display, this.position.y.display, this.position.z.display);
-        console.log(pos);
         return mat4.translate(this.viewMatrix, this.viewMatrix, pos);
       }
     };

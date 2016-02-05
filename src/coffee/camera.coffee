@@ -283,5 +283,5 @@ class DFIR.FPSCamera extends DFIR.Camera
     mat4.rotateY @viewMatrix, @viewMatrix, @rotation
     if @position.x
       pos = vec3.fromValues( @position.x.display, @position.y.display, @position.z.display )
-      console.log pos
+      
       mat4.translate @viewMatrix, @viewMatrix, pos
