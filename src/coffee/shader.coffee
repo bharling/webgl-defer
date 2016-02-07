@@ -219,10 +219,13 @@ class DFIR.TextureMapTypes
 
 class DFIR.Shader
   constructor: (@program) ->
+    @id = DFIR.nextId()
     @params = getShaderParams @program
-    @diffuseMapLoaded = @normalMapLoaded = false
     @buildUniforms()
     @buildAttributes()
+    @ready = true
+
+  bindTextures: ->
     
   buildUniforms : ->
     @uniforms = {}
@@ -235,28 +238,54 @@ class DFIR.Shader
       @attributes[a.name] = gl.getAttribLocation @program, a.name
       
   use : ->
-    gl.useProgram @program
+    if DFIR.currentMaterial != @id
+      gl.useProgram @program
+      @bindTextures()
+    DFIR.currentMaterial = @id
     
   showInfo: ->
     console.log @name
     console.table @params.uniforms
     console.table @params.attributes
     
-  setDiffuseMap: (url) ->
-    loadTexture url, (texture) =>
-      @diffuseMap = texture
-      @diffuseMapLoaded = true
-      
-  setNormalMap: (url) ->
-    loadTexture url, (texture) =>
-      @normalMap = texture
-      @normalMapLoaded = true
-    
   getUniform: (name) ->
     return @uniforms[name]
     
   getAttribute: (name) ->
     return @attributes[name]
+
+
+class DFIR.DiffuseNormalMaterial extends DFIR.Shader
+  constructor: (@program, @diffuseMapUrl, @normalMapUrl) ->
+    super(@program)
+    @diffuseMapLoaded = @normalMapLoaded = false
+    @ready = false
+    @setDiffuseMap @diffuseMapUrl
+    @setNormalMap @normalMapUrl
+
+  bindTextures: () ->
+    gl.activeTexture gl.TEXTURE0
+    gl.bindTexture gl.TEXTURE_2D, @diffuseMap 
+    gl.uniform1i @getUniform('diffuseTex'), 0 
+    gl.activeTexture gl.TEXTURE1 
+    gl.bindTexture gl.TEXTURE_2D, @normalMap 
+    gl.uniform1i @getUniform('normalTex'), 1
+
+
+  setDiffuseMap: (url) ->
+    loadTexture url, (texture) =>
+      @diffuseMap = texture
+      @diffuseMapLoaded = true
+      @ready = @diffuseMapLoaded and @normalMapLoaded
+      
+  setNormalMap: (url) ->
+    loadTexture url, (texture) =>
+      @normalMap = texture
+      @normalMapLoaded = true
+      @ready = @diffuseMapLoaded and @normalMapLoaded
+
+
+
     
     
     

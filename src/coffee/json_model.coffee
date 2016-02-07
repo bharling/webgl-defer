@@ -27,6 +27,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
 
   setMaterial : (shader) ->
+    console.log shader
     @material = shader
 
 

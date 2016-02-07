@@ -35,6 +35,9 @@ DFIR.currentId = 0
 DFIR.nextId = () ->
 	return DFIR.currentId++
 
+DFIR.currentResource = null
+DFIR.currentMaterial = null
+
 
 exports.DFIR = DFIR
 
@@ -171,7 +174,7 @@ class DFIR.Object2D
 
 
 class DFIR.Object3D
-  constructor: ->
+  constructor : (@resource)  ->
     @position = vec3.create()
     @scale = vec3.fromValues 1.0, 1.0, 1.0
     @rotation = quat.create()
@@ -186,35 +189,37 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
+
+  bind: ->
+    return @resource.bind()
+
+  release: ->
+    @resource.release()
+
   draw: (camera) ->
-    if !@material or !@loaded
-      return
-    @material.use()
     @update()
     mat3.normalFromMat4 @normalMatrix, @transform
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, @transform)
-    @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
-    @bindTextures()
-    gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
-    gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
+
+    gl.uniformMatrix4fv @resource.material.getUniform( 'uWorldViewProjectionMatrix' ), false, worldViewProjectionMatrix
+    gl.uniformMatrix3fv @resource.material.getUniform( 'uNormalMatrix'), false, @normalMatrix
+    gl.uniform1f @resource.material.getUniform('nearClip'), camera.near
+    gl.uniform1f @resource.material.getUniform('farClip'), camera.far
+
+    gl.drawElements gl.TRIANGLES, @resource.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
 
 
-  bindTextures: () ->
-    gl.activeTexture gl.TEXTURE0
-    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
-    gl.uniform1i @material.getUniform('diffuseTex'), 0 
-    gl.activeTexture gl.TEXTURE1 
-    gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
-    gl.uniform1i @material.getUniform('normalTex'), 1
+  #bindTextures: () ->
+  #  gl.activeTexture gl.TEXTURE0
+  #  gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
+  #  gl.uniform1i @material.getUniform('diffuseTex'), 0 
+  #  gl.activeTexture gl.TEXTURE1 
+  #  gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
+  #  gl.uniform1i @material.getUniform('normalTex'), 1
 
-  setMatrixUniforms: (wvpMatrix, normalMatrix) ->
-    if !@material
-      return null
-    gl.uniformMatrix4fv @material.getUniform( 'uWorldViewProjectionMatrix' ), false, wvpMatrix
-    gl.uniformMatrix3fv @material.getUniform( 'uNormalMatrix'), false, normalMatrix
-    @setFloatUniform 'farClip', camera.far
+
 
   updateWorldTransform: (parentTransform = null) ->
     mat4.identity @transform
@@ -386,6 +391,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
 
   setMaterial : (shader) ->
+    console.log shader
     @material = shader
 
 
@@ -670,10 +676,13 @@ class DFIR.TextureMapTypes
 
 class DFIR.Shader
   constructor: (@program) ->
+    @id = DFIR.nextId()
     @params = getShaderParams @program
-    @diffuseMapLoaded = @normalMapLoaded = false
     @buildUniforms()
     @buildAttributes()
+    @ready = true
+
+  bindTextures: ->
     
   buildUniforms : ->
     @uniforms = {}
@@ -686,28 +695,54 @@ class DFIR.Shader
       @attributes[a.name] = gl.getAttribLocation @program, a.name
       
   use : ->
-    gl.useProgram @program
+    if DFIR.currentMaterial != @id
+      gl.useProgram @program
+      @bindTextures()
+    DFIR.currentMaterial = @id
     
   showInfo: ->
     console.log @name
     console.table @params.uniforms
     console.table @params.attributes
     
-  setDiffuseMap: (url) ->
-    loadTexture url, (texture) =>
-      @diffuseMap = texture
-      @diffuseMapLoaded = true
-      
-  setNormalMap: (url) ->
-    loadTexture url, (texture) =>
-      @normalMap = texture
-      @normalMapLoaded = true
-    
   getUniform: (name) ->
     return @uniforms[name]
     
   getAttribute: (name) ->
     return @attributes[name]
+
+
+class DFIR.DiffuseNormalMaterial extends DFIR.Shader
+  constructor: (@program, @diffuseMapUrl, @normalMapUrl) ->
+    super(@program)
+    @diffuseMapLoaded = @normalMapLoaded = false
+    @ready = false
+    @setDiffuseMap @diffuseMapUrl
+    @setNormalMap @normalMapUrl
+
+  bindTextures: () ->
+    gl.activeTexture gl.TEXTURE0
+    gl.bindTexture gl.TEXTURE_2D, @diffuseMap 
+    gl.uniform1i @getUniform('diffuseTex'), 0 
+    gl.activeTexture gl.TEXTURE1 
+    gl.bindTexture gl.TEXTURE_2D, @normalMap 
+    gl.uniform1i @getUniform('normalTex'), 1
+
+
+  setDiffuseMap: (url) ->
+    loadTexture url, (texture) =>
+      @diffuseMap = texture
+      @diffuseMapLoaded = true
+      @ready = @diffuseMapLoaded and @normalMapLoaded
+      
+  setNormalMap: (url) ->
+    loadTexture url, (texture) =>
+      @normalMap = texture
+      @normalMapLoaded = true
+      @ready = @diffuseMapLoaded and @normalMapLoaded
+
+
+
     
     
     
@@ -730,7 +765,7 @@ loadJSON = (url, callback) ->
     if request.readyState is 4
       result = JSON.parse( request.responseText )
       DFIR.Geometry.meshCache[key] = result
-      callback JSON.parse( request.responseText )
+      callback result
   request.send()
 
 
@@ -745,13 +780,19 @@ class DFIR.Resource
 
 	bind: () ->
 
+	release: () ->
+
 
 
 
 class DFIR.ModelResource extends DFIR.Resource
 
 	constructor: (@url ) ->
-		super()
+		super(@url)
+		@vertexPositionBuffer = null
+		@vertexTextureCoordBuffer = null
+		@vertexNormalBuffer = null
+		@vertexIndexBuffer = null
 		loadJSON @url, @onDataLoaded
 
 	setMaterial : (shader) ->
@@ -765,19 +806,25 @@ class DFIR.ModelResource extends DFIR.Resource
 	    @loaded = true
 
 
-	ready: () ->
+	isReady: () ->
 		return @ready or @ready = (@loaded && @material && @material.ready)?
 
+	isBound: () ->
+		return DFIR.currentResource is @id
+
 	bind: () ->
-		if !@ready()
+		
+		if !@isReady()
 			return false
 
 		@material.use()
 
+		if @isBound()
+			return true
+
 		positionAttrib = @material.getAttribute( 'aVertexPosition')
 		texCoordsAttrib = @material.getAttribute( 'aVertexTextureCoords')
 		normalsAttrib = @material.getAttribute( 'aVertexNormal' )
-
 
 		gl.enableVertexAttribArray positionAttrib
 		gl.bindBuffer gl.ARRAY_BUFFER, @vertexPositionBuffer.get()
@@ -790,10 +837,16 @@ class DFIR.ModelResource extends DFIR.Resource
 		gl.enableVertexAttribArray normalsAttrib
 		gl.bindBuffer gl.ARRAY_BUFFER, @vertexNormalBuffer.get()
 		gl.vertexAttribPointer normalsAttrib, @vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0
+
+		gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
+
+		DFIR.currentResource = @id
+
 		return true
 
-  release: ->
+  release: () ->
     	gl.bindBuffer gl.ARRAY_BUFFER, null
+    	DFIR.currentResource = null
 
 
 
@@ -802,7 +855,6 @@ class DFIR.ModelResource extends DFIR.Resource
 
 class InertialValue
   constructor: (@value, damping, @dt) ->
-    console.log @dt
     @damping = Math.pow( damping, @dt )
     @last = @value
     @display = @value
@@ -810,7 +862,6 @@ class InertialValue
 
   accelerate: (acceleration) ->
     @velocity += acceleration * @dt
-    console.log @velocity
 
   integrate: ->
     @velocity *= @damping
@@ -1039,7 +1090,6 @@ class DFIR.FPSCamera extends DFIR.Camera
 
   setPosition: (vec) ->
     @position.set vec[0], vec[1], vec[2]
-    console.log @position
 
   pointerMove: (x, y, dx, dy) =>
     if @pointer.pressed

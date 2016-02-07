@@ -4,7 +4,7 @@ class DFIR.Object2D
 
 
 class DFIR.Object3D
-  constructor: ->
+  constructor : (@resource)  ->
     @position = vec3.create()
     @scale = vec3.fromValues 1.0, 1.0, 1.0
     @rotation = quat.create()
@@ -19,35 +19,37 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
+
+  bind: ->
+    return @resource.bind()
+
+  release: ->
+    @resource.release()
+
   draw: (camera) ->
-    if !@material or !@loaded
-      return
-    @material.use()
     @update()
     mat3.normalFromMat4 @normalMatrix, @transform
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, @transform)
-    @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
-    @bindTextures()
-    gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
-    gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
+
+    gl.uniformMatrix4fv @resource.material.getUniform( 'uWorldViewProjectionMatrix' ), false, worldViewProjectionMatrix
+    gl.uniformMatrix3fv @resource.material.getUniform( 'uNormalMatrix'), false, @normalMatrix
+    gl.uniform1f @resource.material.getUniform('nearClip'), camera.near
+    gl.uniform1f @resource.material.getUniform('farClip'), camera.far
+
+    gl.drawElements gl.TRIANGLES, @resource.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
 
 
-  bindTextures: () ->
-    gl.activeTexture gl.TEXTURE0
-    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
-    gl.uniform1i @material.getUniform('diffuseTex'), 0 
-    gl.activeTexture gl.TEXTURE1 
-    gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
-    gl.uniform1i @material.getUniform('normalTex'), 1
+  #bindTextures: () ->
+  #  gl.activeTexture gl.TEXTURE0
+  #  gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
+  #  gl.uniform1i @material.getUniform('diffuseTex'), 0 
+  #  gl.activeTexture gl.TEXTURE1 
+  #  gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
+  #  gl.uniform1i @material.getUniform('normalTex'), 1
 
-  setMatrixUniforms: (wvpMatrix, normalMatrix) ->
-    if !@material
-      return null
-    gl.uniformMatrix4fv @material.getUniform( 'uWorldViewProjectionMatrix' ), false, wvpMatrix
-    gl.uniformMatrix3fv @material.getUniform( 'uNormalMatrix'), false, normalMatrix
-    @setFloatUniform 'farClip', camera.far
+
 
   updateWorldTransform: (parentTransform = null) ->
     mat4.identity @transform

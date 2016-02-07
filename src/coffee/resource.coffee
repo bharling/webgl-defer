@@ -13,7 +13,7 @@ loadJSON = (url, callback) ->
     if request.readyState is 4
       result = JSON.parse( request.responseText )
       DFIR.Geometry.meshCache[key] = result
-      callback JSON.parse( request.responseText )
+      callback result
   request.send()
 
 
@@ -28,13 +28,19 @@ class DFIR.Resource
 
 	bind: () ->
 
+	release: () ->
+
 
 
 
 class DFIR.ModelResource extends DFIR.Resource
 
 	constructor: (@url ) ->
-		super()
+		super(@url)
+		@vertexPositionBuffer = null
+		@vertexTextureCoordBuffer = null
+		@vertexNormalBuffer = null
+		@vertexIndexBuffer = null
 		loadJSON @url, @onDataLoaded
 
 	setMaterial : (shader) ->
@@ -48,19 +54,25 @@ class DFIR.ModelResource extends DFIR.Resource
 	    @loaded = true
 
 
-	ready: () ->
+	isReady: () ->
 		return @ready or @ready = (@loaded && @material && @material.ready)?
 
+	isBound: () ->
+		return DFIR.currentResource is @id
+
 	bind: () ->
-		if !@ready()
+		
+		if !@isReady()
 			return false
 
 		@material.use()
 
+		if @isBound()
+			return true
+
 		positionAttrib = @material.getAttribute( 'aVertexPosition')
 		texCoordsAttrib = @material.getAttribute( 'aVertexTextureCoords')
 		normalsAttrib = @material.getAttribute( 'aVertexNormal' )
-
 
 		gl.enableVertexAttribArray positionAttrib
 		gl.bindBuffer gl.ARRAY_BUFFER, @vertexPositionBuffer.get()
@@ -73,10 +85,16 @@ class DFIR.ModelResource extends DFIR.Resource
 		gl.enableVertexAttribArray normalsAttrib
 		gl.bindBuffer gl.ARRAY_BUFFER, @vertexNormalBuffer.get()
 		gl.vertexAttribPointer normalsAttrib, @vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0
+
+		gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
+
+		DFIR.currentResource = @id
+
 		return true
 
-  release: ->
+  release: () ->
     	gl.bindBuffer gl.ARRAY_BUFFER, null
+    	DFIR.currentResource = null
 
 
 

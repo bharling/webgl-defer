@@ -233,14 +233,16 @@
 	function loadModel () {
 
 		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
-			var mat = new DFIR.Shader( program );
-
+			var mat = new DFIR.DiffuseNormalMaterial( program );
+			mat.setDiffuseMap('textures/diffuse.jpg');
+			mat.setNormalMap('textures/sci_fi_derivative.jpg');
+			var resource = new DFIR.ModelResource('models/teapot.json');
+			resource.setMaterial(mat);
 			for ( var x = 0; x < pots_per_side; x++ )  {
 				for (var y =0; y < pots_per_side; y++) {
-				   pot = new DFIR.JSONGeometry('models/teapot.json');
-				   pot.setMaterial(mat);
-				   pot.material.setDiffuseMap('textures/diffuse.jpg');
-				   pot.material.setNormalMap('textures/sci_fi_derivative.jpg');
+				   //pot = new DFIR.JSONGeometry('models/teapot.json');
+				   //pot.setMaterial(mat);
+				   var pot = new DFIR.Object3D(resource)
 				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 30.0) ]);
 
 				   //pot.setScale([0.5,0.5,0.5]);
@@ -265,8 +267,8 @@
 		var canvas = document.getElementById("canvas");
 		camera = new DFIR.FPSCamera(gbuffer.width, gbuffer.height, canvas);
 		camera.setPosition(vec3.fromValues( 0.0, -80.0, -100.0 ));
-		camera.setNearClip(1.0);
-		camera.setFarClip(600.0);
+		camera.setNearClip(0.001);
+		camera.setFarClip(20000000.0);
 		sunLight = new DFIR.DirectionalLight(vec3.fromValues(0.0, 1.0, 0.5));
 
 

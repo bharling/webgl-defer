@@ -35,6 +35,9 @@ DFIR.currentId = 0
 DFIR.nextId = () ->
 	return DFIR.currentId++
 
+DFIR.currentResource = null
+DFIR.currentMaterial = null
+
 
 exports.DFIR = DFIR
 

@@ -42,6 +42,10 @@ THE SOFTWARE.
     return DFIR.currentId++;
   };
 
+  DFIR.currentResource = null;
+
+  DFIR.currentMaterial = null;
+
   exports.DFIR = DFIR;
 
   mat3.makeTranslation = function(tx, ty) {
@@ -177,7 +181,8 @@ THE SOFTWARE.
   })();
 
   DFIR.Object3D = (function() {
-    function Object3D() {
+    function Object3D(resource) {
+      this.resource = resource;
       this.position = vec3.create();
       this.scale = vec3.fromValues(1.0, 1.0, 1.0);
       this.rotation = quat.create();
@@ -195,39 +200,26 @@ THE SOFTWARE.
       return this.transform;
     };
 
+    Object3D.prototype.bind = function() {
+      return this.resource.bind();
+    };
+
+    Object3D.prototype.release = function() {
+      return this.resource.release();
+    };
+
     Object3D.prototype.draw = function(camera) {
       var worldViewProjectionMatrix;
-      if (!this.material || !this.loaded) {
-        return;
-      }
-      this.material.use();
       this.update();
       mat3.normalFromMat4(this.normalMatrix, this.transform);
       worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, this.transform);
-      this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
-      this.bindTextures();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
-      return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-    };
-
-    Object3D.prototype.bindTextures = function() {
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, this.material.diffuseMap);
-      gl.uniform1i(this.material.getUniform('diffuseTex'), 0);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, this.material.normalMap);
-      return gl.uniform1i(this.material.getUniform('normalTex'), 1);
-    };
-
-    Object3D.prototype.setMatrixUniforms = function(wvpMatrix, normalMatrix) {
-      if (!this.material) {
-        return null;
-      }
-      gl.uniformMatrix4fv(this.material.getUniform('uWorldViewProjectionMatrix'), false, wvpMatrix);
-      gl.uniformMatrix3fv(this.material.getUniform('uNormalMatrix'), false, normalMatrix);
-      return this.setFloatUniform('farClip', camera.far);
+      gl.uniformMatrix4fv(this.resource.material.getUniform('uWorldViewProjectionMatrix'), false, worldViewProjectionMatrix);
+      gl.uniformMatrix3fv(this.resource.material.getUniform('uNormalMatrix'), false, this.normalMatrix);
+      gl.uniform1f(this.resource.material.getUniform('nearClip'), camera.near);
+      gl.uniform1f(this.resource.material.getUniform('farClip'), camera.far);
+      return gl.drawElements(gl.TRIANGLES, this.resource.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
     };
 
     Object3D.prototype.updateWorldTransform = function(parentTransform) {
@@ -462,6 +454,7 @@ THE SOFTWARE.
     }
 
     JSONGeometry.prototype.setMaterial = function(shader) {
+      console.log(shader);
       return this.material = shader;
     };
 
@@ -818,11 +811,14 @@ THE SOFTWARE.
   DFIR.Shader = (function() {
     function Shader(program1) {
       this.program = program1;
+      this.id = DFIR.nextId();
       this.params = getShaderParams(this.program);
-      this.diffuseMapLoaded = this.normalMapLoaded = false;
       this.buildUniforms();
       this.buildAttributes();
+      this.ready = true;
     }
+
+    Shader.prototype.bindTextures = function() {};
 
     Shader.prototype.buildUniforms = function() {
       var j, len, ref, results, u;
@@ -849,31 +845,17 @@ THE SOFTWARE.
     };
 
     Shader.prototype.use = function() {
-      return gl.useProgram(this.program);
+      if (DFIR.currentMaterial !== this.id) {
+        gl.useProgram(this.program);
+        this.bindTextures();
+      }
+      return DFIR.currentMaterial = this.id;
     };
 
     Shader.prototype.showInfo = function() {
       console.log(this.name);
       console.table(this.params.uniforms);
       return console.table(this.params.attributes);
-    };
-
-    Shader.prototype.setDiffuseMap = function(url) {
-      return loadTexture(url, (function(_this) {
-        return function(texture) {
-          _this.diffuseMap = texture;
-          return _this.diffuseMapLoaded = true;
-        };
-      })(this));
-    };
-
-    Shader.prototype.setNormalMap = function(url) {
-      return loadTexture(url, (function(_this) {
-        return function(texture) {
-          _this.normalMap = texture;
-          return _this.normalMapLoaded = true;
-        };
-      })(this));
     };
 
     Shader.prototype.getUniform = function(name) {
@@ -887,6 +869,53 @@ THE SOFTWARE.
     return Shader;
 
   })();
+
+  DFIR.DiffuseNormalMaterial = (function(superClass) {
+    extend(DiffuseNormalMaterial, superClass);
+
+    function DiffuseNormalMaterial(program1, diffuseMapUrl, normalMapUrl) {
+      this.program = program1;
+      this.diffuseMapUrl = diffuseMapUrl;
+      this.normalMapUrl = normalMapUrl;
+      DiffuseNormalMaterial.__super__.constructor.call(this, this.program);
+      this.diffuseMapLoaded = this.normalMapLoaded = false;
+      this.ready = false;
+      this.setDiffuseMap(this.diffuseMapUrl);
+      this.setNormalMap(this.normalMapUrl);
+    }
+
+    DiffuseNormalMaterial.prototype.bindTextures = function() {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.diffuseMap);
+      gl.uniform1i(this.getUniform('diffuseTex'), 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.normalMap);
+      return gl.uniform1i(this.getUniform('normalTex'), 1);
+    };
+
+    DiffuseNormalMaterial.prototype.setDiffuseMap = function(url) {
+      return loadTexture(url, (function(_this) {
+        return function(texture) {
+          _this.diffuseMap = texture;
+          _this.diffuseMapLoaded = true;
+          return _this.ready = _this.diffuseMapLoaded && _this.normalMapLoaded;
+        };
+      })(this));
+    };
+
+    DiffuseNormalMaterial.prototype.setNormalMap = function(url) {
+      return loadTexture(url, (function(_this) {
+        return function(texture) {
+          _this.normalMap = texture;
+          _this.normalMapLoaded = true;
+          return _this.ready = _this.diffuseMapLoaded && _this.normalMapLoaded;
+        };
+      })(this));
+    };
+
+    return DiffuseNormalMaterial;
+
+  })(DFIR.Shader);
 
   loadJSON = function(url, callback) {
     var key, request;
@@ -904,7 +933,7 @@ THE SOFTWARE.
       if (request.readyState === 4) {
         result = JSON.parse(request.responseText);
         DFIR.Geometry.meshCache[key] = result;
-        return callback(JSON.parse(request.responseText));
+        return callback(result);
       }
     };
     return request.send();
@@ -922,6 +951,8 @@ THE SOFTWARE.
 
     Resource.prototype.bind = function() {};
 
+    Resource.prototype.release = function() {};
+
     return Resource;
 
   })();
@@ -932,7 +963,11 @@ THE SOFTWARE.
     function ModelResource(url1) {
       this.url = url1;
       this.onDataLoaded = bind(this.onDataLoaded, this);
-      ModelResource.__super__.constructor.call(this);
+      ModelResource.__super__.constructor.call(this, this.url);
+      this.vertexPositionBuffer = null;
+      this.vertexTextureCoordBuffer = null;
+      this.vertexNormalBuffer = null;
+      this.vertexIndexBuffer = null;
       loadJSON(this.url, this.onDataLoaded);
     }
 
@@ -948,16 +983,23 @@ THE SOFTWARE.
       return this.loaded = true;
     };
 
-    ModelResource.prototype.ready = function() {
+    ModelResource.prototype.isReady = function() {
       return this.ready || (this.ready = (this.loaded && this.material && this.material.ready) != null);
+    };
+
+    ModelResource.prototype.isBound = function() {
+      return DFIR.currentResource === this.id;
     };
 
     ModelResource.prototype.bind = function() {
       var normalsAttrib, positionAttrib, texCoordsAttrib;
-      if (!this.ready()) {
+      if (!this.isReady()) {
         return false;
       }
       this.material.use();
+      if (this.isBound()) {
+        return true;
+      }
       positionAttrib = this.material.getAttribute('aVertexPosition');
       texCoordsAttrib = this.material.getAttribute('aVertexTextureCoords');
       normalsAttrib = this.material.getAttribute('aVertexNormal');
@@ -970,10 +1012,13 @@ THE SOFTWARE.
       gl.enableVertexAttribArray(normalsAttrib);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer.get());
       gl.vertexAttribPointer(normalsAttrib, this.vertexNormalBuffer.itemSize, gl.FLOAT, false, 12, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
+      DFIR.currentResource = this.id;
       return true;
       return {
         release: function() {
-          return gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          return DFIR.currentResource = null;
         }
       };
     };
@@ -986,7 +1031,6 @@ THE SOFTWARE.
     function InertialValue(value1, damping, dt1) {
       this.value = value1;
       this.dt = dt1;
-      console.log(this.dt);
       this.damping = Math.pow(damping, this.dt);
       this.last = this.value;
       this.display = this.value;
@@ -994,8 +1038,7 @@ THE SOFTWARE.
     }
 
     InertialValue.prototype.accelerate = function(acceleration) {
-      this.velocity += acceleration * this.dt;
-      return console.log(this.velocity);
+      return this.velocity += acceleration * this.dt;
     };
 
     InertialValue.prototype.integrate = function() {
@@ -1259,8 +1302,7 @@ THE SOFTWARE.
     }
 
     FPSCamera.prototype.setPosition = function(vec) {
-      this.position.set(vec[0], vec[1], vec[2]);
-      return console.log(this.position);
+      return this.position.set(vec[0], vec[1], vec[2]);
     };
 
     FPSCamera.prototype.pointerMove = function(x, y, dx, dy) {
