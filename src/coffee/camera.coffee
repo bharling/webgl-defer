@@ -2,7 +2,6 @@
 
 class InertialValue
   constructor: (@value, damping, @dt) ->
-    console.log @dt
     @damping = Math.pow( damping, @dt )
     @last = @value
     @display = @value
@@ -10,7 +9,6 @@ class InertialValue
 
   accelerate: (acceleration) ->
     @velocity += acceleration * @dt
-    console.log @velocity
 
   integrate: ->
     @velocity *= @damping
@@ -239,7 +237,6 @@ class DFIR.FPSCamera extends DFIR.Camera
 
   setPosition: (vec) ->
     @position.set vec[0], vec[1], vec[2]
-    console.log @position
 
   pointerMove: (x, y, dx, dy) =>
     if @pointer.pressed

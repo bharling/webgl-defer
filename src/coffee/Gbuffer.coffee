@@ -18,7 +18,7 @@ class DFIR.Gbuffer
     
     # create Texture Units
     @albedoTextureUnit = @createTexture()
-    @normalsTextureUnit = @createTexture(half_ext.HALF_FLOAT_OES)
+    @normalsTextureUnit = @createTexture(@half_ext.HALF_FLOAT_OES)
     #@depthTextureUnit = @createTexture()
     @depthComponent = @createDepthTexture()
     
@@ -27,9 +27,8 @@ class DFIR.Gbuffer
     #gl.framebufferTexture2D gl.FRAMEBUFFER, @mrt_ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
     gl.framebufferTexture2D gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, @depthComponent, 0
     
-    
-    console.log( "GBuffer FrameBuffer status after initialization: " );
-    console.log( gl.checkFramebufferStatus( gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE );
+    status = gl.checkFramebufferStatus gl.FRAMEBUFFER
+    console.log "GBuffer FrameBuffer status after initialization: #{status}";
     
     
     # set draw targets

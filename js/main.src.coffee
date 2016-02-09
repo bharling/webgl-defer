@@ -186,15 +186,16 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
-  draw: (camera) ->
+  draw: (camera, worldMatrix) ->
     if !@material or !@loaded
       return
     @material.use()
     @update()
-    mat3.normalFromMat4 @normalMatrix, @transform
+    worldMatrix ?= @transform
+    mat3.normalFromMat4 @normalMatrix, worldMatrix
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, @transform)
+    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
     @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
@@ -529,7 +530,8 @@ class DFIR.ShaderLoader
     gl.shaderSource fragShader, data
     gl.compileShader fragShader
 
-    console.log gl.getShaderInfoLog( fragShader )
+    if fragmentLog = gl.getShaderInfoLog fragShader
+      console.log fragmentLog
 
     @result.fragmentSource = fragShader
     @fragmentLoaded = true
@@ -542,7 +544,8 @@ class DFIR.ShaderLoader
     gl.shaderSource vertShader, data
     gl.compileShader vertShader
 
-    console.log gl.getShaderInfoLog( vertShader )
+    if log = gl.getShaderInfoLog( vertShader )
+      console.log log
     
     @result.vertexSource = vertShader
     @vertexLoaded = true
@@ -573,7 +576,8 @@ buildShaderProgram = (vertexShader, fragmentShader) ->
   gl.attachShader shaderProgram, fragmentShader
   gl.linkProgram shaderProgram
 
-  console.log gl.getProgramInfoLog( shaderProgram )
+  if log = gl.getProgramInfoLog shaderProgram
+    console.log log
  
   shaderProgram
   
@@ -689,7 +693,7 @@ class DFIR.Shader
     gl.useProgram @program
     
   showInfo: ->
-    console.log @name
+    console.log @program
     console.table @params.uniforms
     console.table @params.attributes
     
@@ -802,7 +806,6 @@ class DFIR.ModelResource extends DFIR.Resource
 
 class InertialValue
   constructor: (@value, damping, @dt) ->
-    console.log @dt
     @damping = Math.pow( damping, @dt )
     @last = @value
     @display = @value
@@ -810,7 +813,6 @@ class InertialValue
 
   accelerate: (acceleration) ->
     @velocity += acceleration * @dt
-    console.log @velocity
 
   integrate: ->
     @velocity *= @damping
@@ -1039,7 +1041,6 @@ class DFIR.FPSCamera extends DFIR.Camera
 
   setPosition: (vec) ->
     @position.set vec[0], vec[1], vec[2]
-    console.log @position
 
   pointerMove: (x, y, dx, dy) =>
     if @pointer.pressed
@@ -1114,7 +1115,7 @@ class DFIR.Gbuffer
     
     # create Texture Units
     @albedoTextureUnit = @createTexture()
-    @normalsTextureUnit = @createTexture(half_ext.HALF_FLOAT_OES)
+    @normalsTextureUnit = @createTexture(@half_ext.HALF_FLOAT_OES)
     #@depthTextureUnit = @createTexture()
     @depthComponent = @createDepthTexture()
     
@@ -1123,9 +1124,8 @@ class DFIR.Gbuffer
     #gl.framebufferTexture2D gl.FRAMEBUFFER, @mrt_ext.COLOR_ATTACHMENT2_WEBGL, gl.TEXTURE_2D, @depthTextureUnit, 0
     gl.framebufferTexture2D gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, @depthComponent, 0
     
-    
-    console.log( "GBuffer FrameBuffer status after initialization: " );
-    console.log( gl.checkFramebufferStatus( gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE );
+    status = gl.checkFramebufferStatus gl.FRAMEBUFFER
+    console.log "GBuffer FrameBuffer status after initialization: #{status}";
     
     
     # set draw targets
@@ -1403,13 +1403,116 @@ class DebugView
     
   
 
-class DFIR.Scene extends DFIR.Object3D
+
+
+class DFIR.Transform
+	constructor: () ->
+		@_translation = vec3.create()
+		@_scale = vec3.fromValues 1.0, 1.0, 1.0
+		@_rotation = quat.create()
+
+	translate: (vec) ->
+		vec3.add @_translation, @_translation, vec
+
+	scale: (num) ->
+		vec3.scale @_scale, @_scale, num
+
+	scaleVector: (vec) ->
+		vec3.multiply @_scale, @_scale, vec
+
+	rotateX: (rad) ->
+		quat.rotateX @_rotation, @_rotation, rad
+
+	rotateY: (rad) ->
+		quat.rotateY @_rotation, @_rotation, rad
+
+	rotateZ: (rad) ->
+		quat.rotateZ @_rotation, @_rotation, rad
+
+
+	getMatrix: (dst) ->
+		dst ?= mat4.create()
+		mat4.fromRotationTranslationScale dst,@_rotation, @_translation, @_scale
+
+
+
+class DFIR.SceneNode
+	constructor: (@transform, @object=null) ->
+		@localMatrix = mat4.create()
+		@worldMatrix = mat4.create()
+		@children = []
+		@parent = null
+		@visible = true
+		@transform ?= new DFIR.Transform()
+
+	# we shortbut to the internal transform class
+	translate: (vec) ->
+		@transform.translate vec
+
+	scale: (num) ->
+		@transform.scale num
+
+	scaleVector: (vec) ->
+		@transform.scaleVector vec
+
+	rotateX: (rad) ->
+		@transform.rotateX rad
+
+	rotateY: (rad) ->
+		@transform.rotateY rad
+
+	rotateZ: (rad) ->
+		@transform.rotateZ rad
+
+	# walk this node and all children
+	# calling callback on all visible
+	walk: (callback) ->
+		if @visible
+			callback this
+			for child in @children
+				callback child
+
+
+	addChild: (child) ->
+		child.setParent this
+
+	setParent: (parent) ->
+		if not parent?
+			return
+		if @parent and this in @parent.children
+			@parent.children = @parent.chilren.filter (child) -> child isnt this
+		if parent.children?
+			parent.children.push @
+		@parent = parent
+
+	updateWorldMatrix: (parentMatrix) ->
+		mat4.copy @localMatrix, @transform.getMatrix()
+		if parentMatrix
+			mat4.multiply @worldMatrix, parentMatrix, @localMatrix
+		else
+			mat4.copy @worldMatrix, @localMatrix 
+
+		for child in @children
+			child.updateWorldMatrix @worldMatrix
+
+
+	attach: (@object) ->
+
+
+
+class DFIR.Scene
+	constructor:() ->
+		@root = new DFIR.SceneNode()
+
+
 	
 class DFIR.Renderer
 	constructor: (canvas) ->
 		@ready = false
+		@debug_view = 0
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
+		@sunPosition = vec3.fromValues 30.0, 60.0, -20.0
 		if !canvas?
 			canvas = document.createElement 'canvas'
 			document.body.appendChild canvas
@@ -1445,22 +1548,66 @@ class DFIR.Renderer
 		gl.enable gl.CULL_FACE
 
 
-	enableGBuffer: (scene, camera) ->
+	enableGBuffer: () ->
 		@gbuffer.bind()
 		gl.cullFace ( gl.BACK ) 
 		gl.blendFunc( gl.ONE, gl.ZERO )
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT )
 		gl.enable(gl.CULL_FACE)
-		
+
+
+	updateGBuffer: (scene, camera) ->
+		# render our gBuffer first
+		@enableGBuffer()
+
+		camera.updateViewMatrix()
+		camera.updateProjectionMatrix()
+		scene.root.updateWorldMatrix()
+
+		scene.root.walk (node) ->
+			if node.object?
+				if node.object.bind()
+					node.object.draw camera, node.worldMatrix
+					node.object.release()
+
+		@gbuffer.release()
+
+
+	doLighting: (scene, camera) ->
+		@quad.material.use()
+		@quad.bind()
+
+		gl.activeTexture(gl.TEXTURE0)
+		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
+
+		gl.activeTexture(gl.TEXTURE1)
+		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getNormalsTextureUnit())
+
+		gl.activeTexture(gl.TEXTURE2)
+		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getAlbedoTextureUnit())
+
+		gl.uniform1i(@quad.material.getUniform('depthTexture'), 0)
+		gl.uniform1i(@quad.material.getUniform('normalsTexture'), 1)
+		gl.uniform1i(@quad.material.getUniform('albedoTexture'), 2)
+
+		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
+
+		#console.log(sunLight.position)
+
+		#sunLight.bind(@quad.material.uniforms)
+
+		gl.uniformMatrix4fv(@quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix())
+
+		#gl.uniform4f(@quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] )
+
+		gl.uniform1i(@quad.material.getUniform('DEBUG'), @debug_view)
+
+		gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
+
+		@quad.release()
 
 	draw : (scene, camera) ->
 		if @ready
-			viewMatrix = camera.getViewMatrix()
-			projectionMatrix = camera.getProjectionMatrix()
+			@updateGBuffer(scene, camera)
+			@doLighting(scene, camera)
 
-			for material in scene.materials
-				material.use()
-				for obj in material.objects
-					obj.draw()
-
-				material.stopUsing()

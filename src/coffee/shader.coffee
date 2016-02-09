@@ -78,7 +78,8 @@ class DFIR.ShaderLoader
     gl.shaderSource fragShader, data
     gl.compileShader fragShader
 
-    console.log gl.getShaderInfoLog( fragShader )
+    if fragmentLog = gl.getShaderInfoLog fragShader
+      console.log fragmentLog
 
     @result.fragmentSource = fragShader
     @fragmentLoaded = true
@@ -91,7 +92,8 @@ class DFIR.ShaderLoader
     gl.shaderSource vertShader, data
     gl.compileShader vertShader
 
-    console.log gl.getShaderInfoLog( vertShader )
+    if log = gl.getShaderInfoLog( vertShader )
+      console.log log
     
     @result.vertexSource = vertShader
     @vertexLoaded = true
@@ -122,7 +124,8 @@ buildShaderProgram = (vertexShader, fragmentShader) ->
   gl.attachShader shaderProgram, fragmentShader
   gl.linkProgram shaderProgram
 
-  console.log gl.getProgramInfoLog( shaderProgram )
+  if log = gl.getProgramInfoLog shaderProgram
+    console.log log
  
   shaderProgram
   
@@ -238,7 +241,7 @@ class DFIR.Shader
     gl.useProgram @program
     
   showInfo: ->
-    console.log @name
+    console.log @program
     console.table @params.uniforms
     console.table @params.attributes
     

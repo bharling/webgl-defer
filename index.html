@@ -21,7 +21,86 @@
 
 <script type="text/javascript">
 
-    var gl, deriv_ext, half_ext;
+	var scene, renderer, camera, canvas, pots = [], lastTime = 0, elapsed = 0;
+
+	function webGLStart() {
+		canvas = document.getElementById("canvas");
+
+		try {
+        	//canvas.width = 1280;
+        	//canvas.height = 720;
+            gl = canvas.getContext("webgl");
+            gl.viewportWidth = canvas.clientWidth;
+            gl.viewportHeight = canvas.clientHeight;
+
+            deriv_ext = gl.getExtension('OES_standard_derivatives');
+            half_ext = gl.getExtension('OES_texture_half_float');
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+
+		scene = new DFIR.Scene();
+		renderer = new DFIR.Renderer(canvas);
+		camera = new DFIR.FPSCamera(gl.drawingBufferWidth, gl.drawingBufferHeight, canvas)
+		camera.setPosition(vec3.fromValues( 0.0, -40.0, -100.0 ));
+		camera.setNearClip(1.0);
+		camera.setFarClip(100000.0);
+
+		var numPots = 4;
+		var spacing = 40;
+		var size = numPots * spacing;
+		var tl = -(size / 2);
+		console.log (tl);
+
+		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
+			var mat = new DFIR.Shader( program );
+			mat.setDiffuseMap('textures/diffuse.jpg');
+			mat.setNormalMap('textures/sci_fi_derivative.jpg');
+			for ( var x = 0; x < numPots; x++ )  {
+				for (var y = 0; y < numPots; y++) {
+				   pot = new DFIR.JSONGeometry('models/teapot.json');
+				   pot.setMaterial(mat);
+				   var node = new DFIR.SceneNode()
+				   node.attach(pot);
+				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
+				   scene.root.addChild(node);
+
+				   pots.push(node);
+				}
+			}
+		});
+
+		tick()
+	}
+
+	function tick () {
+		requestAnimationFrame(tick);
+		var now = performance.now();
+		if (lastTime != 0) {
+			elapsed = now - lastTime;
+		}
+		lastTime = now;
+		updateScene( elapsed );
+		drawScene();
+		
+	}
+
+	function updateScene(timeSinceLastFrame) {
+		camera.update();
+		scene.root.rotateY(0.0005 * timeSinceLastFrame);
+	}
+
+	function drawScene() {
+		renderer.draw(scene, camera);
+	}
+
+	function onSelectChange(value) {
+		renderer.debug_view = value;
+	}
+
+    /*var gl, deriv_ext, half_ext;
     function initGL(canvas) {
         try {
         	canvas.width = 1280;
@@ -295,6 +374,7 @@
 	function onSelectChange(value) {
 		DEBUG_VIEW = value;
 	}
+	*/
 
 
 </script>
@@ -320,7 +400,7 @@
 
 
     <!-- build:remove:dist -->
-    <script src="//localhost:35729/livereload.js"></script>
+    <!-- <script src="//localhost:35729/livereload.js"></script> -->
     <!-- /build -->
 
     <script type="text/javascript" src="js/main.js"></script>

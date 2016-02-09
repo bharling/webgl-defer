@@ -19,15 +19,16 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
-  draw: (camera) ->
+  draw: (camera, worldMatrix) ->
     if !@material or !@loaded
       return
     @material.use()
     @update()
-    mat3.normalFromMat4 @normalMatrix, @transform
+    worldMatrix ?= @transform
+    mat3.normalFromMat4 @normalMatrix, worldMatrix
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, @transform)
+    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
     @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()

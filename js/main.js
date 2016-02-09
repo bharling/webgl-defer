@@ -30,7 +30,8 @@ THE SOFTWARE.
   var DFIR, DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader_type_enums, value,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
-    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
+    indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   exports = typeof exports !== 'undefined' ? exports : window;
 
@@ -195,17 +196,20 @@ THE SOFTWARE.
       return this.transform;
     };
 
-    Object3D.prototype.draw = function(camera) {
+    Object3D.prototype.draw = function(camera, worldMatrix) {
       var worldViewProjectionMatrix;
       if (!this.material || !this.loaded) {
         return;
       }
       this.material.use();
       this.update();
-      mat3.normalFromMat4(this.normalMatrix, this.transform);
+      if (worldMatrix == null) {
+        worldMatrix = this.transform;
+      }
+      mat3.normalFromMat4(this.normalMatrix, worldMatrix);
       worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
-      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, this.transform);
+      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix);
       this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
@@ -654,11 +658,13 @@ THE SOFTWARE.
     };
 
     ShaderLoader.prototype.onFragmentLoaded = function(data) {
-      var fragShader;
+      var fragShader, fragmentLog;
       fragShader = gl.createShader(gl.FRAGMENT_SHADER);
       gl.shaderSource(fragShader, data);
       gl.compileShader(fragShader);
-      console.log(gl.getShaderInfoLog(fragShader));
+      if (fragmentLog = gl.getShaderInfoLog(fragShader)) {
+        console.log(fragmentLog);
+      }
       this.result.fragmentSource = fragShader;
       this.fragmentLoaded = true;
       if (this.checkLoaded()) {
@@ -667,11 +673,13 @@ THE SOFTWARE.
     };
 
     ShaderLoader.prototype.onVertexLoaded = function(data) {
-      var vertShader;
+      var log, vertShader;
       vertShader = gl.createShader(gl.VERTEX_SHADER);
       gl.shaderSource(vertShader, data);
       gl.compileShader(vertShader);
-      console.log(gl.getShaderInfoLog(vertShader));
+      if (log = gl.getShaderInfoLog(vertShader)) {
+        console.log(log);
+      }
       this.result.vertexSource = vertShader;
       this.vertexLoaded = true;
       if (this.checkLoaded()) {
@@ -702,12 +710,14 @@ THE SOFTWARE.
   };
 
   buildShaderProgram = function(vertexShader, fragmentShader) {
-    var shaderProgram;
+    var log, shaderProgram;
     shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
     gl.linkProgram(shaderProgram);
-    console.log(gl.getProgramInfoLog(shaderProgram));
+    if (log = gl.getProgramInfoLog(shaderProgram)) {
+      console.log(log);
+    }
     return shaderProgram;
   };
 
@@ -853,7 +863,7 @@ THE SOFTWARE.
     };
 
     Shader.prototype.showInfo = function() {
-      console.log(this.name);
+      console.log(this.program);
       console.table(this.params.uniforms);
       return console.table(this.params.attributes);
     };
@@ -986,7 +996,6 @@ THE SOFTWARE.
     function InertialValue(value1, damping, dt1) {
       this.value = value1;
       this.dt = dt1;
-      console.log(this.dt);
       this.damping = Math.pow(damping, this.dt);
       this.last = this.value;
       this.display = this.value;
@@ -994,8 +1003,7 @@ THE SOFTWARE.
     }
 
     InertialValue.prototype.accelerate = function(acceleration) {
-      this.velocity += acceleration * this.dt;
-      return console.log(this.velocity);
+      return this.velocity += acceleration * this.dt;
     };
 
     InertialValue.prototype.integrate = function() {
@@ -1259,8 +1267,7 @@ THE SOFTWARE.
     }
 
     FPSCamera.prototype.setPosition = function(vec) {
-      this.position.set(vec[0], vec[1], vec[2]);
-      return console.log(this.position);
+      return this.position.set(vec[0], vec[1], vec[2]);
     };
 
     FPSCamera.prototype.pointerMove = function(x, y, dx, dy) {
@@ -1358,19 +1365,20 @@ THE SOFTWARE.
     }
 
     Gbuffer.prototype.createFrameBuffer = function() {
+      var status;
       this.mrt_ext = gl.getExtension('WEBGL_draw_buffers');
       this.half_ext = gl.getExtension("OES_texture_half_float");
       this.depth_ext = gl.getExtension("WEBKIT_WEBGL_depth_texture") || gl.getExtension("WEBGL_depth_texture");
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
       this.albedoTextureUnit = this.createTexture();
-      this.normalsTextureUnit = this.createTexture(half_ext.HALF_FLOAT_OES);
+      this.normalsTextureUnit = this.createTexture(this.half_ext.HALF_FLOAT_OES);
       this.depthComponent = this.createDepthTexture();
       gl.framebufferTexture2D(gl.FRAMEBUFFER, this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, this.albedoTextureUnit, 0);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, this.normalsTextureUnit, 0);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depthComponent, 0);
-      console.log("GBuffer FrameBuffer status after initialization: ");
-      console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE);
+      status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      console.log("GBuffer FrameBuffer status after initialization: " + status);
       this.mrt_ext.drawBuffersWEBGL([this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL]);
       return this.release();
     };
@@ -1573,22 +1581,160 @@ THE SOFTWARE.
 
   })();
 
-  DFIR.Scene = (function(superClass) {
-    extend(Scene, superClass);
+  DFIR.Transform = (function() {
+    function Transform() {
+      this._translation = vec3.create();
+      this._scale = vec3.fromValues(1.0, 1.0, 1.0);
+      this._rotation = quat.create();
+    }
 
+    Transform.prototype.translate = function(vec) {
+      return vec3.add(this._translation, this._translation, vec);
+    };
+
+    Transform.prototype.scale = function(num) {
+      return vec3.scale(this._scale, this._scale, num);
+    };
+
+    Transform.prototype.scaleVector = function(vec) {
+      return vec3.multiply(this._scale, this._scale, vec);
+    };
+
+    Transform.prototype.rotateX = function(rad) {
+      return quat.rotateX(this._rotation, this._rotation, rad);
+    };
+
+    Transform.prototype.rotateY = function(rad) {
+      return quat.rotateY(this._rotation, this._rotation, rad);
+    };
+
+    Transform.prototype.rotateZ = function(rad) {
+      return quat.rotateZ(this._rotation, this._rotation, rad);
+    };
+
+    Transform.prototype.getMatrix = function(dst) {
+      if (dst == null) {
+        dst = mat4.create();
+      }
+      return mat4.fromRotationTranslationScale(dst, this._rotation, this._translation, this._scale);
+    };
+
+    return Transform;
+
+  })();
+
+  DFIR.SceneNode = (function() {
+    function SceneNode(transform, object) {
+      this.transform = transform;
+      this.object = object != null ? object : null;
+      this.localMatrix = mat4.create();
+      this.worldMatrix = mat4.create();
+      this.children = [];
+      this.parent = null;
+      this.visible = true;
+      if (this.transform == null) {
+        this.transform = new DFIR.Transform();
+      }
+    }
+
+    SceneNode.prototype.translate = function(vec) {
+      return this.transform.translate(vec);
+    };
+
+    SceneNode.prototype.scale = function(num) {
+      return this.transform.scale(num);
+    };
+
+    SceneNode.prototype.scaleVector = function(vec) {
+      return this.transform.scaleVector(vec);
+    };
+
+    SceneNode.prototype.rotateX = function(rad) {
+      return this.transform.rotateX(rad);
+    };
+
+    SceneNode.prototype.rotateY = function(rad) {
+      return this.transform.rotateY(rad);
+    };
+
+    SceneNode.prototype.rotateZ = function(rad) {
+      return this.transform.rotateZ(rad);
+    };
+
+    SceneNode.prototype.walk = function(callback) {
+      var child, j, len, ref, results;
+      if (this.visible) {
+        callback(this);
+        ref = this.children;
+        results = [];
+        for (j = 0, len = ref.length; j < len; j++) {
+          child = ref[j];
+          results.push(callback(child));
+        }
+        return results;
+      }
+    };
+
+    SceneNode.prototype.addChild = function(child) {
+      return child.setParent(this);
+    };
+
+    SceneNode.prototype.setParent = function(parent) {
+      if (parent == null) {
+        return;
+      }
+      if (this.parent && indexOf.call(this.parent.children, this) >= 0) {
+        this.parent.children = this.parent.chilren.filter(function(child) {
+          return child !== this;
+        });
+      }
+      if (parent.children != null) {
+        parent.children.push(this);
+      }
+      return this.parent = parent;
+    };
+
+    SceneNode.prototype.updateWorldMatrix = function(parentMatrix) {
+      var child, j, len, ref, results;
+      mat4.copy(this.localMatrix, this.transform.getMatrix());
+      if (parentMatrix) {
+        mat4.multiply(this.worldMatrix, parentMatrix, this.localMatrix);
+      } else {
+        mat4.copy(this.worldMatrix, this.localMatrix);
+      }
+      ref = this.children;
+      results = [];
+      for (j = 0, len = ref.length; j < len; j++) {
+        child = ref[j];
+        results.push(child.updateWorldMatrix(this.worldMatrix));
+      }
+      return results;
+    };
+
+    SceneNode.prototype.attach = function(object) {
+      this.object = object;
+    };
+
+    return SceneNode;
+
+  })();
+
+  DFIR.Scene = (function() {
     function Scene() {
-      return Scene.__super__.constructor.apply(this, arguments);
+      this.root = new DFIR.SceneNode();
     }
 
     return Scene;
 
-  })(DFIR.Object3D);
+  })();
 
   DFIR.Renderer = (function() {
     function Renderer(canvas) {
       this.ready = false;
+      this.debug_view = 0;
       this.width = canvas ? canvas.width : 1280;
       this.height = canvas ? canvas.height : 720;
+      this.sunPosition = vec3.fromValues(30.0, 60.0, -20.0);
       if (canvas == null) {
         canvas = document.createElement('canvas');
         document.body.appendChild(canvas);
@@ -1626,7 +1772,7 @@ THE SOFTWARE.
       return gl.enable(gl.CULL_FACE);
     };
 
-    Renderer.prototype.enableGBuffer = function(scene, camera) {
+    Renderer.prototype.enableGBuffer = function() {
       this.gbuffer.bind();
       gl.cullFace(gl.BACK);
       gl.blendFunc(gl.ONE, gl.ZERO);
@@ -1634,24 +1780,45 @@ THE SOFTWARE.
       return gl.enable(gl.CULL_FACE);
     };
 
-    Renderer.prototype.draw = function(scene, camera) {
-      var j, l, len, len1, material, obj, projectionMatrix, ref, ref1, results, viewMatrix;
-      if (this.ready) {
-        viewMatrix = camera.getViewMatrix();
-        projectionMatrix = camera.getProjectionMatrix();
-        ref = scene.materials;
-        results = [];
-        for (j = 0, len = ref.length; j < len; j++) {
-          material = ref[j];
-          material.use();
-          ref1 = material.objects;
-          for (l = 0, len1 = ref1.length; l < len1; l++) {
-            obj = ref1[l];
-            obj.draw();
+    Renderer.prototype.updateGBuffer = function(scene, camera) {
+      this.enableGBuffer();
+      camera.updateViewMatrix();
+      camera.updateProjectionMatrix();
+      scene.root.updateWorldMatrix();
+      scene.root.walk(function(node) {
+        if (node.object != null) {
+          if (node.object.bind()) {
+            node.object.draw(camera, node.worldMatrix);
+            return node.object.release();
           }
-          results.push(material.stopUsing());
         }
-        return results;
+      });
+      return this.gbuffer.release();
+    };
+
+    Renderer.prototype.doLighting = function(scene, camera) {
+      this.quad.material.use();
+      this.quad.bind();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getNormalsTextureUnit());
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getAlbedoTextureUnit());
+      gl.uniform1i(this.quad.material.getUniform('depthTexture'), 0);
+      gl.uniform1i(this.quad.material.getUniform('normalsTexture'), 1);
+      gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
+      gl.uniform3fv(this.quad.material.getUniform('lightPosition'), this.sunPosition);
+      gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
+      gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
+      gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
+      return this.quad.release();
+    };
+
+    Renderer.prototype.draw = function(scene, camera) {
+      if (this.ready) {
+        this.updateGBuffer(scene, camera);
+        return this.doLighting(scene, camera);
       }
     };
 
