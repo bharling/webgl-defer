@@ -275,15 +275,15 @@ THE SOFTWARE.
     };
 
     Object3D.prototype.visit = function(func) {
-      var c, j, len, ref, results;
+      var c, l, len, ref, results;
       if (!this.visible) {
         return;
       }
       func(this);
       ref = this.children;
       results = [];
-      for (j = 0, len = ref.length; j < len; j++) {
-        c = ref[j];
+      for (l = 0, len = ref.length; l < len; l++) {
+        c = ref[l];
         results.push(c.visit(func));
       }
       return results;
@@ -339,14 +339,14 @@ THE SOFTWARE.
   })(DFIR.Object3D);
 
   mergeVertices = function(vertices, faces) {
-    var changes, i, j, key, precision, precisionPoints, ref, results, unique, v, verticesMap;
+    var changes, i, key, l, precision, precisionPoints, ref, results, unique, v, verticesMap;
     verticesMap = {};
     unique = [];
     changes = [];
     precisionPoints = 4;
     precision = Math.pow(10, precisionPoints);
     results = [];
-    for (i = j = 0, ref = vertices.length; j < ref; i = j += 1) {
+    for (i = l = 0, ref = vertices.length; l < ref; i = l += 1) {
       v = vertices[i];
       key = (Math.round(v[0] * precision)) + "_" + (Math.round(v[1] * precision)) + "_" + (Math.round(v[2] * precision));
       if (verticesMap[key] != null) {
@@ -458,6 +458,7 @@ THE SOFTWARE.
     extend(JSONGeometry, superClass);
 
     function JSONGeometry(url) {
+      this.parseThreeJSModel = bind(this.parseThreeJSModel, this);
       this.onDataLoaded = bind(this.onDataLoaded, this);
       JSONGeometry.__super__.constructor.call(this);
       loadJSON(url, this.onDataLoaded);
@@ -503,11 +504,159 @@ THE SOFTWARE.
     };
 
     JSONGeometry.prototype.onDataLoaded = function(data) {
-      this.vertexPositionBuffer = new DFIR.Buffer(new Float32Array(data.vertexPositions), 3, gl.STATIC_DRAW);
-      this.vertexTextureCoordBuffer = new DFIR.Buffer(new Float32Array(data.vertexTextureCoords), 2, gl.STATIC_DRAW);
-      this.vertexNormalBuffer = new DFIR.Buffer(new Float32Array(data.vertexNormals), 3, gl.STATIC_DRAW);
-      this.vertexIndexBuffer = new DFIR.Buffer(new Uint16Array(data.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
+      if (data.vertexPositions != null) {
+        this.vertexPositionBuffer = new DFIR.Buffer(new Float32Array(data.vertexPositions), 3, gl.STATIC_DRAW);
+        this.vertexTextureCoordBuffer = new DFIR.Buffer(new Float32Array(data.vertexTextureCoords), 2, gl.STATIC_DRAW);
+        this.vertexNormalBuffer = new DFIR.Buffer(new Float32Array(data.vertexNormals), 3, gl.STATIC_DRAW);
+        this.vertexIndexBuffer = new DFIR.Buffer(new Uint16Array(data.indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
+        return this.loaded = true;
+      } else if (data.faces != null) {
+        return this.parseThreeJSModel(data);
+      }
+    };
+
+    JSONGeometry.prototype.parseThreeJSModel = function(data) {
+      var faces, hasFaceColor, hasFaceNormal, hasFaceVertexColor, hasFaceVertexNormal, hasFaceVertexUv, hasMaterial, i, indices, isBitSet, isQuad, j, l, m, normal, normalIndex, normals, numUvLayers, o, offset, p, q, r, ref, ref1, type, u, uvIndex, uvLayer, uvs, v, vertexNormals, vertexPositions, vertexUvs, vertices, zLength;
+      isBitSet = function(value, position) {
+        return value & (1 << position);
+      };
+      vertices = data.vertices;
+      uvs = data.uvs;
+      indices = [];
+      normals = data.normals;
+      vertexNormals = [];
+      vertexUvs = [];
+      vertexPositions = [];
+      this.vertexPositionBuffer = new DFIR.Buffer(new Float32Array(data.vertices), 3, gl.STATIC_DRAW);
+      this.vertexTextureCoordBuffer = new DFIR.Buffer(new Float32Array(data.uvs[0]), 2, gl.STATIC_DRAW);
+      numUvLayers = data.uvs.length;
+      faces = data.faces;
+      zLength = faces.length;
+      offset = 0;
+      while (offset < zLength) {
+        type = faces[offset++];
+        isQuad = isBitSet(type, 0);
+        hasMaterial = isBitSet(type, 1);
+        hasFaceVertexUv = isBitSet(type, 3);
+        hasFaceNormal = isBitSet(type, 4);
+        hasFaceVertexNormal = isBitSet(type, 5);
+        hasFaceColor = isBitSet(type, 6);
+        hasFaceVertexColor = isBitSet(type, 7);
+        if (isQuad) {
+          indices.push(faces[offset]);
+          indices.push(faces[offset + 1]);
+          indices.push(faces[offset + 3]);
+          indices.push(faces[offset + 1]);
+          indices.push(faces[offset + 2]);
+          indices.push(faces[offset + 3]);
+          offset += 4;
+          if (hasMaterial) {
+            offset++;
+          }
+          if (hasFaceVertexUv) {
+            for (i = l = 0, ref = numUvLayers; l < ref; i = l += 1) {
+              uvLayer = data.uvs[i];
+              for (j = m = 0; m < 4; j = m += 1) {
+                uvIndex = faces[offset++];
+                u = uvLayer[uvIndex * 2];
+                v = uvLayer[uvIndex * 2 + 1];
+                if (j !== 2) {
+                  vertexUvs.push(u);
+                  vertexUvs.push(v);
+                }
+                if (j !== 0) {
+                  vertexUvs.push(u);
+                  vertexUvs.push(v);
+                }
+              }
+            }
+          }
+          if (hasFaceNormal) {
+            offset++;
+          }
+          if (hasFaceVertexNormal) {
+            for (i = o = 0; o < 4; i = o += 1) {
+              normalIndex = faces[offset++] * 3;
+              normal = [normalIndex++, normalIndex++, normalIndex];
+              if (i !== 2) {
+                vertexNormals.push(normals[normal[0]]);
+                vertexNormals.push(normals[normal[1]]);
+                vertexNormals.push(normals[normal[2]]);
+              }
+              if (i !== 0) {
+                vertexNormals.push(normals[normal[0]]);
+                vertexNormals.push(normals[normal[1]]);
+                vertexNormals.push(normals[normal[2]]);
+              }
+            }
+          }
+          if (hasFaceColor) {
+            offset++;
+          }
+          if (hasFaceVertexColor) {
+            offset += 4;
+          }
+        } else {
+          indices.push(faces[offset++]);
+          indices.push(faces[offset++]);
+          indices.push(faces[offset++]);
+          if (hasMaterial) {
+            offset++;
+          }
+          if (hasFaceVertexUv) {
+            for (i = p = 0, ref1 = numUvLayers; p < ref1; i = p += 1) {
+              uvLayer = data.uvs[i];
+              for (j = q = 0; q < 3; j = q += 1) {
+                uvIndex = faces[offset++];
+                u = uvLayer[uvIndex * 2];
+                v = uvLayer[uvIndex * 2 + 1];
+                if (j !== 2) {
+                  vertexUvs.push(u);
+                  vertexUvs.push(v);
+                }
+                if (j !== 0) {
+                  vertexUvs.push(u);
+                  vertexUvs.push(v);
+                }
+              }
+            }
+          }
+          if (hasFaceNormal) {
+            offset++;
+          }
+          if (hasFaceVertexNormal) {
+            for (i = r = 0; r < 3; i = r += 1) {
+              normalIndex = faces[offset++] * 3;
+              vertexNormals.push(normals[normalIndex++]);
+              vertexNormals.push(normals[normalIndex++]);
+              vertexNormals.push(normals[normalIndex]);
+            }
+          }
+          if (hasFaceColor) {
+            offset++;
+          }
+          if (hasFaceVertexColor) {
+            offset += 3;
+          }
+        }
+      }
+      this.vertexNormalBuffer = new DFIR.Buffer(new Float32Array(vertexNormals), 3, gl.STATIC_DRAW);
+      this.vertexIndexBuffer = new DFIR.Buffer(new Uint16Array(indices), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER);
       return this.loaded = true;
+    };
+
+    JSONGeometry.prototype.normalizeNormals = function(normals) {
+      var i, l, n, ref, x, y, z;
+      for (i = l = 0, ref = normals.length; l < ref; i = l += 3) {
+        x = normals[i];
+        y = normals[i + 1];
+        z = normals[i + 2];
+        n = 1.0 / Math.sqrt(x * x + y * y + z * z);
+        normals[i] *= n;
+        normals[i + 1] *= n;
+        normals[i + 2] *= n;
+      }
+      return normals;
     };
 
     JSONGeometry.load = function(url) {
@@ -764,7 +913,7 @@ THE SOFTWARE.
   };
 
   getShaderParams = function(program) {
-    var activeAttributes, activeUniforms, attribute, i, j, l, ref, ref1, result, uniform;
+    var activeAttributes, activeUniforms, attribute, i, l, m, ref, ref1, result, uniform;
     gl.useProgram(program);
     result = {
       attributes: [],
@@ -774,13 +923,13 @@ THE SOFTWARE.
     };
     activeUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
     activeAttributes = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
-    for (i = j = 0, ref = activeUniforms; 0 <= ref ? j < ref : j > ref; i = 0 <= ref ? ++j : --j) {
+    for (i = l = 0, ref = activeUniforms; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
       uniform = gl.getActiveUniform(program, i);
       uniform.typeName = shader_type_enums[uniform.type];
       result.uniforms.push(uniform);
       result.uniformCount += uniform.size;
     }
-    for (i = l = 0, ref1 = activeAttributes; 0 <= ref1 ? l < ref1 : l > ref1; i = 0 <= ref1 ? ++l : --l) {
+    for (i = m = 0, ref1 = activeAttributes; 0 <= ref1 ? m < ref1 : m > ref1; i = 0 <= ref1 ? ++m : --m) {
       attribute = gl.getActiveAttrib(program, i);
       attribute.typeName = shader_type_enums[attribute.type];
       result.attributes.push(attribute);
@@ -835,24 +984,24 @@ THE SOFTWARE.
     }
 
     Shader.prototype.buildUniforms = function() {
-      var j, len, ref, results, u;
+      var l, len, ref, results, u;
       this.uniforms = {};
       ref = this.params.uniforms;
       results = [];
-      for (j = 0, len = ref.length; j < len; j++) {
-        u = ref[j];
+      for (l = 0, len = ref.length; l < len; l++) {
+        u = ref[l];
         results.push(this.uniforms[u.name] = gl.getUniformLocation(this.program, u.name));
       }
       return results;
     };
 
     Shader.prototype.buildAttributes = function() {
-      var a, j, len, ref, results;
+      var a, l, len, ref, results;
       this.attributes = {};
       ref = this.params.attributes;
       results = [];
-      for (j = 0, len = ref.length; j < len; j++) {
-        a = ref[j];
+      for (l = 0, len = ref.length; l < len; l++) {
+        a = ref[l];
         results.push(this.attributes[a.name] = gl.getAttribLocation(this.program, a.name));
       }
       return results;
@@ -1442,7 +1591,7 @@ THE SOFTWARE.
     }
 
     DebugGridView.prototype.build_geometry = function(num_levels) {
-      var current_level, f, ht, indices, j, ref, texcoords, verts, wd, x, y;
+      var current_level, f, ht, indices, l, ref, texcoords, verts, wd, x, y;
       x = -1.0;
       y = -1.0;
       ht = 2.0 / num_levels;
@@ -1451,7 +1600,7 @@ THE SOFTWARE.
       this.textureCoords = [];
       this.indices = [];
       f = 0;
-      for (current_level = j = 1, ref = num_levels; 1 <= ref ? j <= ref : j >= ref; current_level = 1 <= ref ? ++j : --j) {
+      for (current_level = l = 1, ref = num_levels; 1 <= ref ? l <= ref : l >= ref; current_level = 1 <= ref ? ++l : --l) {
         verts = [x, y, current_level, x + ht, y, current_level, x + ht, y + ht, current_level, x, y + ht, current_level];
         texcoords = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
         indices = [f, f + 1, f + 2, f + 2, f + 3, f];
@@ -1534,7 +1683,7 @@ THE SOFTWARE.
     }
 
     DebugView.prototype.draw = function(camera) {
-      var i, j, ref, results;
+      var i, l, ref, results;
       this.material.use();
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
@@ -1547,7 +1696,7 @@ THE SOFTWARE.
       gl.uniform1i(this.material.getUniform('albedoTexture'), 2);
       gl.uniformMatrix4fv(this.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
       results = [];
-      for (i = j = 0, ref = this.quads.length; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+      for (i = l = 0, ref = this.quads.length; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
         results.push(this.drawQuad(i));
       }
       return results;
@@ -1662,13 +1811,13 @@ THE SOFTWARE.
     };
 
     SceneNode.prototype.walk = function(callback) {
-      var child, j, len, ref, results;
+      var child, l, len, ref, results;
       if (this.visible) {
         callback(this);
         ref = this.children;
         results = [];
-        for (j = 0, len = ref.length; j < len; j++) {
-          child = ref[j];
+        for (l = 0, len = ref.length; l < len; l++) {
+          child = ref[l];
           results.push(callback(child));
         }
         return results;
@@ -1695,7 +1844,7 @@ THE SOFTWARE.
     };
 
     SceneNode.prototype.updateWorldMatrix = function(parentMatrix) {
-      var child, j, len, ref, results;
+      var child, l, len, ref, results;
       mat4.copy(this.localMatrix, this.transform.getMatrix());
       if (parentMatrix) {
         mat4.multiply(this.worldMatrix, parentMatrix, this.localMatrix);
@@ -1704,8 +1853,8 @@ THE SOFTWARE.
       }
       ref = this.children;
       results = [];
-      for (j = 0, len = ref.length; j < len; j++) {
-        child = ref[j];
+      for (l = 0, len = ref.length; l < len; l++) {
+        child = ref[l];
         results.push(child.updateWorldMatrix(this.worldMatrix));
       }
       return results;

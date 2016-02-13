@@ -49,22 +49,25 @@
 		camera.setFarClip(100000.0);
 
 		var numPots = 4;
-		var spacing = 40;
+		var spacing = 37;
 		var size = numPots * spacing;
-		var tl = -(size / 2);
+		var tl = -(size / 2) + (spacing/2);
 		console.log (tl);
 
 		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
 			var mat = new DFIR.Shader( program );
+
 			mat.setDiffuseMap('textures/diffuse.jpg');
-			mat.setNormalMap('textures/sci_fi_derivative.jpg');
+			mat.setNormalMap('textures/normals.png');
+			mat.showInfo();
 			for ( var x = 0; x < numPots; x++ )  {
 				for (var y = 0; y < numPots; y++) {
-				   pot = new DFIR.JSONGeometry('models/teapot.json');
+				   pot = new DFIR.JSONGeometry('models/cube.json');
 				   pot.setMaterial(mat);
 				   var node = new DFIR.SceneNode()
 				   node.attach(pot);
 				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
+				   node.scale(10.0);
 				   scene.root.addChild(node);
 
 				   pots.push(node);
