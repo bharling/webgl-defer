@@ -604,9 +604,9 @@ THE SOFTWARE.
             offset++;
           }
           if (hasFaceVertexUv) {
-            for (i = p = 0, ref1 = numUvLayers; p < ref1; i = p += 1) {
+            for (i = p = 0, ref1 = numUvLayers; 0 <= ref1 ? p < ref1 : p > ref1; i = 0 <= ref1 ? ++p : --p) {
               uvLayer = data.uvs[i];
-              for (j = q = 0; q < 3; j = q += 1) {
+              for (j = q = 0; q < 3; j = ++q) {
                 uvIndex = faces[offset++];
                 u = uvLayer[uvIndex * 2];
                 v = uvLayer[uvIndex * 2 + 1];
@@ -622,6 +622,7 @@ THE SOFTWARE.
             }
           }
           if (hasFaceNormal) {
+            console.log("hasFaceNormal");
             offset++;
           }
           if (hasFaceVertexNormal) {

@@ -62,12 +62,12 @@
 			mat.showInfo();
 			for ( var x = 0; x < numPots; x++ )  {
 				for (var y = 0; y < numPots; y++) {
-				   pot = new DFIR.JSONGeometry('models/cube.json');
+				   pot = new DFIR.JSONGeometry('models/torus.json');
 				   pot.setMaterial(mat);
 				   var node = new DFIR.SceneNode()
 				   node.attach(pot);
 				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
-				   node.scale(10.0);
+				   node.scale(6.0);
 				   scene.root.addChild(node);
 
 				   pots.push(node);

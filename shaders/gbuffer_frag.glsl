@@ -10,7 +10,7 @@
   uniform float nearClip;
   uniform mat3 uNormalMatrix;
   uniform sampler2D diffuseTex;
-  uniform sampler2D normalTex;
+  //uniform sampler2D normalTex;
 
   /*
     Pack floating point into color
@@ -45,6 +45,7 @@
     return mat3( T * invmax, B * invmax, N );
   }
 
+/*
   vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ) {
     // assume N, the interpolated vertex normal and
     // V, the view vector (vertex to eye)
@@ -61,7 +62,7 @@
     mat3 TBN = cotangent_frame( N, -V, texcoord );
     return normalize( TBN * map );
   }
-
+*/
 
 
   // end no-tangents normal mapping
@@ -81,7 +82,7 @@
   void main (void) {
     vec3 N = normalize(uNormalMatrix * vNormal);
 
-    N = perturb_normal(N, vEyeDirection, vTexCoords );
+    //N = perturb_normal(N, vEyeDirection, vTexCoords );
 
     float metalness = 0.6;
     float roughness = 0.2;
@@ -90,6 +91,6 @@
 
   	//vec4 n = encodeNormal( _normal );
 
-    gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
+    gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);//texture2D( diffuseTex, vTexCoords);
     gl_FragData[1] = vec4( n.xyz, 1.0 );
   }

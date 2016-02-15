@@ -109,12 +109,8 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
     @vertexPositionBuffer = new DFIR.Buffer( new Float32Array( data.vertices ), 3, gl.STATIC_DRAW )
     @vertexTextureCoordBuffer = new DFIR.Buffer( new Float32Array( data.uvs[0] ), 2, gl.STATIC_DRAW )
-    #@vertexNormalBuffer = new DFIR.Buffer( new Float32Array( data.normals ), 3, gl.STATIC_DRAW )
 
     numUvLayers = data.uvs.length
-
-    #console.log "UV Layers #{data.uvs.length}"
-
     faces = data.faces
 
     zLength = faces.length
@@ -122,9 +118,6 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
     while offset < zLength
       type = faces[offset++]
-
-      #console.log "Type #{type}"
-
       isQuad              = isBitSet( type, 0 )
       hasMaterial         = isBitSet( type, 1 )
       hasFaceVertexUv     = isBitSet( type, 3 )
@@ -133,15 +126,15 @@ class DFIR.JSONGeometry extends DFIR.Object3D
       hasFaceColor       = isBitSet( type, 6 )
       hasFaceVertexColor  = isBitSet( type, 7 )
 
+      #console.log type
+
       if isQuad
         indices.push faces[ offset ]
         indices.push faces[ offset + 1 ]
         indices.push faces[ offset + 3 ]
-
         indices.push faces[ offset + 1 ]
         indices.push faces[ offset + 2 ]
         indices.push faces[ offset + 3 ]
-
         offset += 4
 
         if hasMaterial
@@ -178,32 +171,25 @@ class DFIR.JSONGeometry extends DFIR.Object3D
                 vertexNormals.push normals[normal[1]]
                 vertexNormals.push normals[normal[2]]
 
-
-
-
         if hasFaceColor
           offset++
 
         if hasFaceVertexColor
           offset += 4
-
       else
-
         indices.push faces[offset++]
         indices.push faces[offset++]
         indices.push faces[offset++]
 
         if hasMaterial
           offset++
-
         if hasFaceVertexUv
-          for i in [0 ... numUvLayers] by 1
+          for i in [0 ... numUvLayers]
             uvLayer = data.uvs[i]
-            for j in [0 ... 3] by 1
+            for j in [0 ... 3]
               uvIndex = faces[offset++]
               u = uvLayer[ uvIndex * 2 ]
               v = uvLayer[ uvIndex * 2 + 1 ]
-
               if j isnt 2 
                 vertexUvs.push u
                 vertexUvs.push v
@@ -212,15 +198,20 @@ class DFIR.JSONGeometry extends DFIR.Object3D
                 vertexUvs.push v
 
         if hasFaceNormal
+          console.log "hasFaceNormal"
           offset++
 
         if hasFaceVertexNormal
           for i in [0 ... 3] by 1
             normalIndex = faces[ offset++ ] * 3
-
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex]
+
+            #vertexNormals.push 0.0
+            #vertexNormals.push 1.0
+            #vertexNormals.push 0.0
+            
 
         if hasFaceColor
           offset++
