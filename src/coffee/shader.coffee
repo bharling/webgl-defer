@@ -268,7 +268,6 @@ class DFIR.PBRShader extends DFIR.Shader
     @roughness = 0.0
 
   use: ->
-    console.log @metallic
     gl.useProgram @program
     gl.uniform1f(@getUniform('metallic'), @metallic)
     gl.uniform1f(@getUniform('roughness'), @roughness)

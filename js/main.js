@@ -1059,7 +1059,6 @@ THE SOFTWARE.
     }
 
     PBRShader.prototype.use = function() {
-      console.log(this.metallic);
       gl.useProgram(this.program);
       gl.uniform1f(this.getUniform('metallic'), this.metallic);
       return gl.uniform1f(this.getUniform('roughness'), this.roughness);
@@ -1917,6 +1916,7 @@ THE SOFTWARE.
       this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
       this.metallic = 1.0;
       this.roughness = 0.5;
+      this.exposure = 1.0;
       if (canvas == null) {
         canvas = document.createElement('canvas');
         document.body.appendChild(canvas);
@@ -1997,6 +1997,7 @@ THE SOFTWARE.
       gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
       gl.uniform3fv(this.quad.material.getUniform('lightPosition'), this.sunPosition);
       gl.uniform3fv(this.quad.material.getUniform('lightColor'), this.sunColor);
+      gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
       gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);

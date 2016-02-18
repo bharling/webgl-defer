@@ -12,6 +12,7 @@ uniform mat4 uViewMatrix;
 // Directional Light
 uniform vec3 lightPosition;
 uniform vec3 lightColor;
+uniform float exposure;
 
 varying vec2 vTexCoords;
 
@@ -194,6 +195,15 @@ vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, v
 
 }
 
+
+vec4 reinhardt (vec4 col) {
+  col *= exposure;
+  col = col/(1.0+col);
+  vec3 ret = pow(col.xyz, vec3(1.0/2.2));
+  return vec4(ret, 1.0);
+
+}
+
 void main (void) {
 
 	float DEBUG = floor(debug);
@@ -254,9 +264,9 @@ void main (void) {
   }
 
   vec3 sunColor = lightColor.xyz;
-  float strength = 10.0;
+  float strength = 1.0;
   vec3 sunDir = -lightPosition.xyz;
-  float attenuation = 1.4;
+  float attenuation = 0.2;
 
   //vec3 normal, vec3 diffuse, float sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic
 
@@ -265,7 +275,9 @@ void main (void) {
 
   vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, ld, vp, attenuation, roughness, metallic);
 
-  gl_FragColor = color;
+  color += vec4(0.0001, 0.0001, 0.0002, 0.0);
+
+  gl_FragColor = reinhardt( color );
 
 
   // vec3 worldPosition = viewPosition;

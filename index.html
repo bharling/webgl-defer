@@ -142,6 +142,10 @@
 		function updateRoughness (value) {
 			material.roughness = parseFloat(value);
 		}
+
+		function updateExposure( value ) {
+			renderer.exposure = value;
+		}
 </script>
 
 
@@ -199,6 +203,9 @@
 
 	<label>roughness</label>
 	<input type="range" id="roughness" min="0.0" max="1.0" step="0.001" onchange="updateRoughness(this.value);" oninput="updateRoughness(this.value);">
+
+<label>Exposure</label>
+<input type="range" id="exposure" min="0.0" max="40.0" step="0.001" onchange="updateExposure(this.value);" oninput="updateExposure(this.value);">
 </div>
 
 	<p id="drawCalls">

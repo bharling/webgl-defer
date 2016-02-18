@@ -8,6 +8,7 @@ class DFIR.Renderer
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
 		@metallic = 1.0
 		@roughness = 0.5
+		@exposure = 1.0
 		if !canvas?
 			canvas = document.createElement 'canvas'
 			document.body.appendChild canvas
@@ -95,6 +96,7 @@ class DFIR.Renderer
 
 		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
 		gl.uniform3fv(@quad.material.getUniform('lightColor'), @sunColor)
+		gl.uniform1f(@quad.material.getUniform('exposure'), @exposure)
 		#console.log(sunLight.position)
 
 		#sunLight.bind(@quad.material.uniforms)
