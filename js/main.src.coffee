@@ -563,7 +563,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
         if hasFaceVertexNormal
           for i in [0 ... 3] by 1
-            normalIndex = faces[ offset++ ] * 3
+            normalIndex = faces[ offset++ ]
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex]
@@ -1092,6 +1092,12 @@ class DFIR.Camera extends DFIR.Object3D
     invProjMatrix = mat4.create()
     mat4.invert invProjMatrix, @projectionMatrix
     invProjMatrix
+
+  getInverseViewProjectionMatrix: ->
+    vpMatrix = mat4.create()
+    mat4.multiply vpMatrix, @projectionMatrix, @viewMatrix
+    mat4.invert vpMatrix, vpMatrix
+    vpMatrix
 
   updateViewMatrix: ->
     mat4.identity @viewMatrix
@@ -1625,7 +1631,10 @@ class DFIR.SceneNode
 		if @visible
 			callback this
 			for child in @children
-				callback child
+				child.walk(callback)
+
+			
+			
 
 
 	addChild: (child) ->
@@ -1668,6 +1677,7 @@ class DFIR.Renderer
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
 		@sunPosition = vec3.fromValues 30.0, 60.0, -20.0
+		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
 		if !canvas?
 			canvas = document.createElement 'canvas'
 			document.body.appendChild canvas
@@ -1681,6 +1691,7 @@ class DFIR.Renderer
 		@gbuffer = new DFIR.Gbuffer(1.0)
 		@createTargets()
 		@setDefaults()
+		@drawCallCount = 0
 
 
 
@@ -1719,11 +1730,16 @@ class DFIR.Renderer
 		camera.updateProjectionMatrix()
 		scene.root.updateWorldMatrix()
 
+
+		dc = 0
 		scene.root.walk (node) ->
 			if node.object?
 				if node.object.bind()
 					node.object.draw camera, node.worldMatrix
 					node.object.release()
+					dc++
+
+		@drawCallCount = dc
 
 		@gbuffer.release()
 
@@ -1746,7 +1762,7 @@ class DFIR.Renderer
 		gl.uniform1i(@quad.material.getUniform('albedoTexture'), 2)
 
 		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
-
+		gl.uniform3fv(@quad.material.getUniform('lightColor'), @sunColor)
 		#console.log(sunLight.position)
 
 		#sunLight.bind(@quad.material.uniforms)

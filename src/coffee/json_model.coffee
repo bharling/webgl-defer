@@ -203,7 +203,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
         if hasFaceVertexNormal
           for i in [0 ... 3] by 1
-            normalIndex = faces[ offset++ ] * 3
+            normalIndex = faces[ offset++ ]
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex++]
             vertexNormals.push normals[normalIndex]

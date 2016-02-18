@@ -65,7 +65,10 @@ class DFIR.SceneNode
 		if @visible
 			callback this
 			for child in @children
-				callback child
+				child.walk(callback)
+
+			
+			
 
 
 	addChild: (child) ->

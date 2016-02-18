@@ -134,6 +134,12 @@ class DFIR.Camera extends DFIR.Object3D
     mat4.invert invProjMatrix, @projectionMatrix
     invProjMatrix
 
+  getInverseViewProjectionMatrix: ->
+    vpMatrix = mat4.create()
+    mat4.multiply vpMatrix, @projectionMatrix, @viewMatrix
+    mat4.invert vpMatrix, vpMatrix
+    vpMatrix
+
   updateViewMatrix: ->
     mat4.identity @viewMatrix
     mat4.lookAt @viewMatrix, @position, @target, @up

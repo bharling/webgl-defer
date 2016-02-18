@@ -627,7 +627,7 @@ THE SOFTWARE.
           }
           if (hasFaceVertexNormal) {
             for (i = r = 0; r < 3; i = r += 1) {
-              normalIndex = faces[offset++] * 3;
+              normalIndex = faces[offset++];
               vertexNormals.push(normals[normalIndex++]);
               vertexNormals.push(normals[normalIndex++]);
               vertexNormals.push(normals[normalIndex]);
@@ -1290,6 +1290,14 @@ THE SOFTWARE.
       return invProjMatrix;
     };
 
+    Camera.prototype.getInverseViewProjectionMatrix = function() {
+      var vpMatrix;
+      vpMatrix = mat4.create();
+      mat4.multiply(vpMatrix, this.projectionMatrix, this.viewMatrix);
+      mat4.invert(vpMatrix, vpMatrix);
+      return vpMatrix;
+    };
+
     Camera.prototype.updateViewMatrix = function() {
       mat4.identity(this.viewMatrix);
       return mat4.lookAt(this.viewMatrix, this.position, this.target, this.up);
@@ -1819,7 +1827,7 @@ THE SOFTWARE.
         results = [];
         for (l = 0, len = ref.length; l < len; l++) {
           child = ref[l];
-          results.push(callback(child));
+          results.push(child.walk(callback));
         }
         return results;
       }
@@ -1885,6 +1893,7 @@ THE SOFTWARE.
       this.width = canvas ? canvas.width : 1280;
       this.height = canvas ? canvas.height : 720;
       this.sunPosition = vec3.fromValues(30.0, 60.0, -20.0);
+      this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
       if (canvas == null) {
         canvas = document.createElement('canvas');
         document.body.appendChild(canvas);
@@ -1898,6 +1907,7 @@ THE SOFTWARE.
       this.gbuffer = new DFIR.Gbuffer(1.0);
       this.createTargets();
       this.setDefaults();
+      this.drawCallCount = 0;
     }
 
     Renderer.prototype.createTargets = function() {
@@ -1931,18 +1941,22 @@ THE SOFTWARE.
     };
 
     Renderer.prototype.updateGBuffer = function(scene, camera) {
+      var dc;
       this.enableGBuffer();
       camera.updateViewMatrix();
       camera.updateProjectionMatrix();
       scene.root.updateWorldMatrix();
+      dc = 0;
       scene.root.walk(function(node) {
         if (node.object != null) {
           if (node.object.bind()) {
             node.object.draw(camera, node.worldMatrix);
-            return node.object.release();
+            node.object.release();
+            return dc++;
           }
         }
       });
+      this.drawCallCount = dc;
       return this.gbuffer.release();
     };
 
@@ -1959,6 +1973,7 @@ THE SOFTWARE.
       gl.uniform1i(this.quad.material.getUniform('normalsTexture'), 1);
       gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
       gl.uniform3fv(this.quad.material.getUniform('lightPosition'), this.sunPosition);
+      gl.uniform3fv(this.quad.material.getUniform('lightColor'), this.sunColor);
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
       gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);

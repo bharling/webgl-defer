@@ -21,7 +21,7 @@
 
 <script type="text/javascript">
 
-	var scene, renderer, camera, canvas, pots = [], lastTime = 0, elapsed = 0;
+	var scene, renderer, camera, canvas, potsRoot, torusRoot, lastTime = 0, elapsed = 0;
 
 	function webGLStart() {
 		canvas = document.getElementById("canvas");
@@ -54,27 +54,48 @@
 		var tl = -(size / 2) + (spacing/2);
 		console.log (tl);
 
+		torusRoot = new DFIR.SceneNode();
+		potsRoot = new DFIR.SceneNode();
+
 		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
 			var mat = new DFIR.Shader( program );
 
-			mat.setDiffuseMap('textures/diffuse.jpg');
-			mat.setNormalMap('textures/normals.png');
+			mat.setDiffuseMap('textures/egyptrockyfull.jpg');
+			mat.setNormalMap('textures/NMStripes.png');
 			mat.showInfo();
+			
+
+			torusRoot.setParent(scene.root);
+			potsRoot.setParent(scene.root);
+			//scene.root.addChild(potsRoot);
+
+			var node;
+
 			for ( var x = 0; x < numPots; x++ )  {
 				for (var y = 0; y < numPots; y++) {
-				   pot = new DFIR.JSONGeometry('models/torus.json');
-				   pot.setMaterial(mat);
-				   var node = new DFIR.SceneNode()
-				   node.attach(pot);
+				   t = new DFIR.JSONGeometry('models/torus.json');
+				   t.setMaterial(mat);
+				   node = new DFIR.SceneNode()
+				   node.attach(t);
 				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
 				   node.scale(6.0);
-				   scene.root.addChild(node);
+				   node.setParent(torusRoot);
 
-				   pots.push(node);
+				   p = new DFIR.JSONGeometry('models/teapot.json');
+				   p.setMaterial(mat);
+				   node = new DFIR.SceneNode()
+				   node.attach(p);
+				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
+				   node.setParent(potsRoot);
+				   //pots.push(node);
 				}
 			}
-		});
 
+			torusRoot.visible = false;
+
+
+		});
+		//window.onSceneSelect("0");
 		tick()
 	}
 
@@ -87,6 +108,7 @@
 		lastTime = now;
 		updateScene( elapsed );
 		drawScene();
+		document.getElementById('drawCalls').innerHTML = renderer.drawCallCount;
 		
 	}
 
@@ -103,285 +125,24 @@
 		renderer.debug_view = value;
 	}
 
-    /*var gl, deriv_ext, half_ext;
-    function initGL(canvas) {
-        try {
-        	canvas.width = 1280;
-        	canvas.height = 720;
-            gl = canvas.getContext("webgl");
-            gl.viewportWidth = canvas.width;
-            gl.viewportHeight = canvas.height;
-
-            deriv_ext = gl.getExtension('OES_standard_derivatives');
-            half_ext = gl.getExtension('OES_texture_half_float');
-        } catch (e) {
-        }
-        if (!gl) {
-            alert("Could not initialise WebGL, sorry :-(");
-        }
-    }
-
-
-    var shaderProgram;
-
-
-    var mvMatrix = mat4.create();
-    var pMatrix = mat4.create();
-    var mvMatrixStack = [];
-   	var sunLight;
-
-
-
-    function mvPushMatrix() {
-    	var copy = mat4.create();
-    	mat4.copy(copy, mvMatrix);
-    	mvMatrixStack.push(copy);
-    }
-
-    function mvPopMatrix() {
-    	if (mvMatrixStack.length == 0) {
-    		throw "Invalid PopMatrix!";
-    	}
-    	mvMatrix = mvMatrixStack.pop();
-    }
-
-
-
-
-
-    var triangleVertexPositionBuffer;
-    var triangleVertexColorBuffer;
-    var squareVertexPositionBuffer;
-    var squareVertexColorBuffer;
-
-
-
-	function degToRad(degrees) {
-		return degrees * Math.PI / 180;
-	}
-
-
-	var rTri = 0;
-	var rSquare = 0;
-
-	var DEBUG_VIEW = 0;
-
-
-	function defaultRenderSettings () {
-		gl.clearColor( 0.0, 0.0, 0.0, 0.0);
-		gl.enable(gl.DEPTH_TEST);
-		gl.depthFunc(gl.LEQUAL);
-		gl.depthMask(true);
-		gl.clearDepth(1.0);
-		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-		gl.enable(gl.CULL_FACE);
-	}
-
-
-	function updateScene( timeSinceLastFrame ) {
-		rTri += 0.05 * timeSinceLastFrame;
-		pots[1].rotateY( 0.005 * timeSinceLastFrame);
-		pots[2].rotateY( -0.003 * timeSinceLastFrame );
-
-		camera.update();
-
-		var angle = degToRad(rTri);
-        var radius = 30.0;
-        //camera.setPosition([ radius * Math.sin(-angle), 20.0, radius * Math.cos(-angle) ]);
-        sunLight.setPosition([ radius * Math.sin(angle*1.5), 20, radius * Math.cos(angle*1.5) ]);
-	}
-
-    function drawScene() {
-
-    	gbuffer.bind();
-
-
-    	gl.cullFace ( gl.BACK ) ;
-    	gl.blendFunc( gl.ONE, gl.ZERO );
-    	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
-    	gl.enable(gl.CULL_FACE);
-
-
-
-        camera.updateViewMatrix();
-        camera.updateProjectionMatrix();
-
-        //var viewMatrix = camera.getViewMatrix();
-
-        //var projectionMatrix = camera.getProjectionMatrix();
-
-
-        for ( var i=0; i < pots.length; i ++ ) {
-        	var pot = pots[i];
-
-        	if (pot.bind()) {
-
-
-        		pot.draw(camera);
-        		pot.release();
-
-        	}
-        }
-
-
-        gbuffer.release();
-
-        if (quad) {
-        	quad.material.use();
-	        quad.bind();
-
-	        gl.activeTexture(gl.TEXTURE0);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
-
-	        gl.activeTexture(gl.TEXTURE1);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
-
-	        gl.activeTexture(gl.TEXTURE2);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
-
-	        gl.uniform1i(quad.material.getUniform('depthTexture'), 0);
-	        gl.uniform1i(quad.material.getUniform('normalsTexture'), 1);
-	        gl.uniform1i(quad.material.getUniform('albedoTexture'), 2);
-
-	        gl.uniform3fv(quad.material.getUniform('lightPosition'), sunLight.position);
-
-	        //console.log(sunLight.position)
-
-	        //sunLight.bind(quad.material.uniforms);
-
-	        gl.uniformMatrix4fv(quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
-
-	        //gl.uniform4f(quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
-
-	        gl.uniform1i(quad.material.getUniform('DEBUG'), DEBUG_VIEW);
-
-	        gl.drawArrays(gl.TRIANGLES, 0, quad.vertexBuffer.numItems);
-
-	        quad.release();
-        }
-
-
-
-        //gl.disable( gl.CULL_FACE );
-        if (debug_material) {
-        	debug_material.use();
-
-	        gl.activeTexture(gl.TEXTURE0);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getDepthTextureUnit());
-
-	        gl.activeTexture(gl.TEXTURE1);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getNormalsTextureUnit());
-
-	        gl.activeTexture(gl.TEXTURE2);
-	        gl.bindTexture(gl.TEXTURE_2D, gbuffer.getAlbedoTextureUnit());
-
-	        gl.uniform1i(debug_material.getUniform('depthTexture'), 0);
-	        gl.uniform1i(debug_material.getUniform('normalsTexture'), 1);
-	        gl.uniform1i(debug_material.getUniform('albedoTexture'), 2);
-
-	        gl.uniformMatrix4fv(debug_material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
-
-	        //gl.uniform4f(debug_material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] );
-
-	        debug_grid.bind(debug_material);
-	        debug_grid.draw();
-	        debug_grid.release();
-        }
-
-    }
-
-	var lastTime = 0, elapsed = 0;
-
-
-
-	function tick () {
-		requestAnimationFrame(tick);
-		var now = new Date().getTime();
-		if (lastTime != 0) {
-			elapsed = now - lastTime;
-		}
-		updateScene( elapsed );
-		drawScene();
-		lastTime = now;
-	}
-
-	var teapot, quad, camera, debug_grid, debug_material;
-	var pots = [];
-
-	var pots_per_side = 2;
-	var pots_half = 30.0 * (pots_per_side / 2);
-
-	function loadModel () {
-
-		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
-			var mat = new DFIR.Shader( program );
-
-			for ( var x = 0; x < pots_per_side; x++ )  {
-				for (var y =0; y < pots_per_side; y++) {
-				   pot = new DFIR.JSONGeometry('models/teapot.json');
-				   pot.setMaterial(mat);
-				   pot.material.setDiffuseMap('textures/diffuse.jpg');
-				   pot.material.setNormalMap('textures/sci_fi_derivative.jpg');
-				   pot.setPosition([-pots_half + (x * 30.0), 0.0, -pots_half + (y * 30.0) ]);
-
-				   //pot.setScale([0.5,0.5,0.5]);
-				   pots.push(pot);
-				}
-			}
-
-			pots[1].setScale([1.2, 1.2, 1.2]);
-		});
-
-		DFIR.ShaderLoader.load( 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', function (program) {
-			quad = new DFIR.FullscreenQuad();
-			quad.setMaterial ( new DFIR.Shader ( program ));
-			quad.material.showInfo();
-		});
-
-
-		DFIR.ShaderLoader.load('shaders/debug_grid_vert.glsl', 'shaders/fs_quad_frag.glsl', function (program) {
-			debug_grid = new DFIR.DebugGridView(6);
-			debug_material = new DFIR.Shader ( program );
-		});
-		var canvas = document.getElementById("canvas");
-		camera = new DFIR.FPSCamera(gbuffer.width, gbuffer.height, canvas);
-		camera.setPosition(vec3.fromValues( 0.0, -80.0, -100.0 ));
-		camera.setNearClip(1.0);
-		camera.setFarClip(600.0);
-		sunLight = new DFIR.DirectionalLight(vec3.fromValues(0.0, 1.0, 0.5));
-
-
-	}
-
-
-	var gbuffer;
-
-    function webGLStart() {
-
-        var canvas = document.getElementById("canvas");
-        initGL(canvas);
-
-        gbuffer = new DFIR.Gbuffer(1.0);
-
-
-        //initShaders();
-
-        loadModel();
-
-        defaultRenderSettings();
-
-        tick();
-    }
-
-	function onSelectChange(value) {
-		DEBUG_VIEW = value;
-	}
-	*/
-
+   	function onSceneSelect(value) {
+   		potsRoot.visible = (value == "0");
+   		torusRoot.visible = (value == "1");
+   	}
 
 </script>
 
+
+<style type="text/css" media="screen">
+	#drawCalls {
+		font-size: 2rem;
+		font-family: Lucida sans-serif;
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		color:red;
+	}
+</style>
 
 </head>
 
@@ -401,9 +162,18 @@
 		<option value="6">Decoded View Position (x 10)</option>
 	</select>
 
+	<select name="scene" onchange="onSceneSelect(this.value);" style="position: absolute;top: 40px;left:10px;">
+		<option value="0">Teapots</option>
+		<option value="1">Torii</option>
+	</select>
+
+	<p id="drawCalls">
+	0
+	</p>
+
 
     <!-- build:remove:dist -->
-    <!-- <script src="//localhost:35729/livereload.js"></script> -->
+    <script src="//localhost:35729/livereload.js"></script>
     <!-- /build -->
 
     <script type="text/javascript" src="js/main.js"></script>
