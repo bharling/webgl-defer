@@ -622,17 +622,17 @@ getShader = (id) ->
     shader = gl.createShader gl.VERTEX_SHADER
   else
     return null
-    
+
   gl.shaderSource shader, str
   gl.compileShader shader
-  
+
   console.log id, gl.getShaderInfoLog( shader )
 
   if !gl.getShaderParameter(shader, gl.COMPILE_STATUS)
     console.log id, gl.getShaderInfoLog( shader )
     return null
   return shader
-  
+
 
 
 class DFIR.Uniform
@@ -657,29 +657,29 @@ class DFIR.UniformVec3 extends DFIR.Uniform
   setValue: (vec) ->
     gl.uniform3fv @location, 3, vec
 
-  
+
 class DFIR.ShaderSource
   constructor: (@vertexSource, @fragmentSource) ->
 
 
 class DFIR.ShaderLoader
   constructor: (@vertUrl, @fragUrl, @callback) ->
-    
+
     @fragmentLoaded = false
     @vertexLoaded = false
-    
+
     @result = new DFIR.ShaderSource()
-    
+
     loadShaderAjax @vertUrl, @onVertexLoaded
     loadShaderAjax @fragUrl, @onFragmentLoaded
-        
+
   checkLoaded: ->
     loaded = @fragmentLoaded and @vertexLoaded
     return @fragmentLoaded and @vertexLoaded
-    
+
   buildShader: ->
     return buildShaderProgram( @result.vertexSource, @result.fragmentSource )
-    
+
   onFragmentLoaded: (data) =>
     fragShader = gl.createShader gl.FRAGMENT_SHADER
     gl.shaderSource fragShader, data
@@ -693,7 +693,7 @@ class DFIR.ShaderLoader
     if @checkLoaded()
       @callback @buildShader()
 
-    
+
   onVertexLoaded: (data) =>
     vertShader = gl.createShader gl.VERTEX_SHADER
     gl.shaderSource vertShader, data
@@ -701,30 +701,30 @@ class DFIR.ShaderLoader
 
     if log = gl.getShaderInfoLog( vertShader )
       console.log log
-    
+
     @result.vertexSource = vertShader
     @vertexLoaded = true
     if @checkLoaded()
       @callback @buildShader()
-    
+
   @load: (vertUrl, fragUrl, callback) ->
     new ShaderLoader vertUrl, fragUrl, callback
-  
+
 
 loadResource = (url, callback) ->
-    
 
-  
+
+
 loadShaderAjax = (url, callback) ->
   request = new XMLHttpRequest()
   request.open 'GET', url
-  
+
   request.onreadystatechange = () ->
     if request.readyState is 4
       callback request.responseText
   request.send()
-  
-  
+
+
 buildShaderProgram = (vertexShader, fragmentShader) ->
   shaderProgram = gl.createProgram()
   gl.attachShader shaderProgram, vertexShader
@@ -733,14 +733,14 @@ buildShaderProgram = (vertexShader, fragmentShader) ->
 
   if log = gl.getProgramInfoLog shaderProgram
     console.log log
- 
+
   shaderProgram
-  
+
 buildProgram = (vertexSourceId, fragmentSourceId) ->
   fragmentShader = getShader fragmentSourceId
   vertexShader = getShader vertexSourceId
   return buildProgramFromStrings vertexShader, fragmentShader
-  
+
 buildProgramFromStrings = (vertexSource, fragmentSource) ->
   shaderProgram = gl.createProgram()
   gl.attachShader shaderProgram, vertexSource
@@ -751,8 +751,8 @@ buildProgramFromStrings = (vertexSource, fragmentSource) ->
 
   shaderProgram
 
-  
-  
+
+
 shader_type_enums =
     0x8B50: 'FLOAT_VEC2',
     0x8B51: 'FLOAT_VEC3',
@@ -776,7 +776,7 @@ shader_type_enums =
     0x1404: 'INT',
     0x1405: 'UNSIGNED_INT',
     0x1406: 'FLOAT'
-  
+
 getShaderParams = (program) ->
   gl.useProgram program
   result =
@@ -784,24 +784,24 @@ getShaderParams = (program) ->
     uniforms : []
     attributeCount : 0
     uniformCount : 0
-    
+
   activeUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
   activeAttributes = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES)
-  
+
   for i in [0 ... activeUniforms]
     uniform = gl.getActiveUniform program, i
     uniform.typeName = shader_type_enums[ uniform.type ]
     result.uniforms.push uniform
     result.uniformCount += uniform.size
-    
+
   for i in [0 ... activeAttributes]
     attribute = gl.getActiveAttrib program, i
     attribute.typeName = shader_type_enums[ attribute.type ]
     result.attributes.push attribute
     result.attributeCount += attribute.size
   result
-  
-  
+
+
 loadTexture = (url, callback) ->
   tex = gl.createTexture()
   tex.image = new Image()
@@ -817,7 +817,7 @@ loadTexture = (url, callback) ->
     gl.bindTexture gl.TEXTURE_2D, null
     callback tex )
   tex.image.src = url
-  
+
 
 class DFIR.TextureMapTypes
   @DIFFUSE = 0x01
@@ -825,7 +825,7 @@ class DFIR.TextureMapTypes
   @SPECULAR = 0x03
   @CUBE = 0x04
   @SPHERE = 0x05
-  
+
 
 class DFIR.Shader
   constructor: (@program) ->
@@ -833,46 +833,52 @@ class DFIR.Shader
     @diffuseMapLoaded = @normalMapLoaded = false
     @buildUniforms()
     @buildAttributes()
-    
+
   buildUniforms : ->
     @uniforms = {}
     for u in @params.uniforms
       @uniforms[u.name] = gl.getUniformLocation @program, u.name
-    
+
   buildAttributes : ->
     @attributes = {}
     for a in @params.attributes
       @attributes[a.name] = gl.getAttribLocation @program, a.name
-      
+
   use : ->
     gl.useProgram @program
-    
+
   showInfo: ->
     console.log @program
     console.table @params.uniforms
     console.table @params.attributes
-    
+
   setDiffuseMap: (url) ->
     loadTexture url, (texture) =>
       @diffuseMap = texture
       @diffuseMapLoaded = true
-      
+
   setNormalMap: (url) ->
     loadTexture url, (texture) =>
       @normalMap = texture
       @normalMapLoaded = true
-    
+
   getUniform: (name) ->
     return @uniforms[name]
-    
+
   getAttribute: (name) ->
     return @attributes[name]
-    
-    
-    
-  
-  
 
+class DFIR.PBRShader extends DFIR.Shader
+  constructor: (@program) ->
+    super( @program )
+    @metallic = 0.0
+    @roughness = 0.0
+
+  use: ->
+    console.log @metallic
+    gl.useProgram @program
+    gl.uniform1f(@getUniform('metallic'), @metallic)
+    gl.uniform1f(@getUniform('roughness'), @roughness)
 
 loadJSON = (url, callback) ->
   key = md5(url)
@@ -1676,8 +1682,10 @@ class DFIR.Renderer
 		@debug_view = 0
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
-		@sunPosition = vec3.fromValues 30.0, 60.0, -20.0
+		@sunPosition = vec3.fromValues 30.0, 60.0, 20.0
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
+		@metallic = 1.0
+		@roughness = 0.5
 		if !canvas?
 			canvas = document.createElement 'canvas'
 			document.body.appendChild canvas
@@ -1716,7 +1724,7 @@ class DFIR.Renderer
 
 	enableGBuffer: () ->
 		@gbuffer.bind()
-		gl.cullFace ( gl.BACK ) 
+		gl.cullFace ( gl.BACK )
 		gl.blendFunc( gl.ONE, gl.ZERO )
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT )
 		gl.enable(gl.CULL_FACE)
@@ -1735,6 +1743,8 @@ class DFIR.Renderer
 		scene.root.walk (node) ->
 			if node.object?
 				if node.object.bind()
+					#gl.uniform1f(node.object.material.getUniform('metallic'), @metallic)
+					#gl.uniform1f(node.object.material.getUniform('roughness'), @roughness);
 					node.object.draw camera, node.worldMatrix
 					node.object.release()
 					dc++
@@ -1781,4 +1791,3 @@ class DFIR.Renderer
 		if @ready
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
-

@@ -1048,6 +1048,27 @@ THE SOFTWARE.
 
   })();
 
+  DFIR.PBRShader = (function(superClass) {
+    extend(PBRShader, superClass);
+
+    function PBRShader(program1) {
+      this.program = program1;
+      PBRShader.__super__.constructor.call(this, this.program);
+      this.metallic = 0.0;
+      this.roughness = 0.0;
+    }
+
+    PBRShader.prototype.use = function() {
+      console.log(this.metallic);
+      gl.useProgram(this.program);
+      gl.uniform1f(this.getUniform('metallic'), this.metallic);
+      return gl.uniform1f(this.getUniform('roughness'), this.roughness);
+    };
+
+    return PBRShader;
+
+  })(DFIR.Shader);
+
   loadJSON = function(url, callback) {
     var key, request;
     key = md5(url);
@@ -1892,8 +1913,10 @@ THE SOFTWARE.
       this.debug_view = 0;
       this.width = canvas ? canvas.width : 1280;
       this.height = canvas ? canvas.height : 720;
-      this.sunPosition = vec3.fromValues(30.0, 60.0, -20.0);
+      this.sunPosition = vec3.fromValues(30.0, 60.0, 20.0);
       this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
+      this.metallic = 1.0;
+      this.roughness = 0.5;
       if (canvas == null) {
         canvas = document.createElement('canvas');
         document.body.appendChild(canvas);

@@ -21,7 +21,7 @@
 
 <script type="text/javascript">
 
-	var scene, renderer, camera, canvas, potsRoot, torusRoot, lastTime = 0, elapsed = 0;
+	var scene, renderer, camera, canvas, potsRoot, torusRoot, material, lastTime = 0, elapsed = 0;
 
 	function webGLStart() {
 		canvas = document.getElementById("canvas");
@@ -58,12 +58,16 @@
 		potsRoot = new DFIR.SceneNode();
 
 		DFIR.ShaderLoader.load('shaders/gbuffer_vert.glsl', 'shaders/gbuffer_frag.glsl', function (program) {
-			var mat = new DFIR.Shader( program );
+			material = new DFIR.PBRShader( program );
 
-			mat.setDiffuseMap('textures/egyptrockyfull.jpg');
-			mat.setNormalMap('textures/NMStripes.png');
-			mat.showInfo();
-			
+			material.setDiffuseMap('textures/diffuse.jpg');
+			material.setNormalMap('textures/NMStripes.png');
+			//material.normalMapLoaded = true;
+			material.showInfo();
+
+			material.roughness = 0.0;
+			material.metallic = 0.6;
+
 
 			torusRoot.setParent(scene.root);
 			potsRoot.setParent(scene.root);
@@ -74,7 +78,7 @@
 			for ( var x = 0; x < numPots; x++ )  {
 				for (var y = 0; y < numPots; y++) {
 				   t = new DFIR.JSONGeometry('models/torus.json');
-				   t.setMaterial(mat);
+				   t.setMaterial(material);
 				   node = new DFIR.SceneNode()
 				   node.attach(t);
 				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
@@ -82,7 +86,7 @@
 				   node.setParent(torusRoot);
 
 				   p = new DFIR.JSONGeometry('models/teapot.json');
-				   p.setMaterial(mat);
+				   p.setMaterial(material);
 				   node = new DFIR.SceneNode()
 				   node.attach(p);
 				   node.translate( vec3.fromValues( tl + (spacing*x), 0.0, tl + (spacing*y) ));
@@ -109,7 +113,7 @@
 		updateScene( elapsed );
 		drawScene();
 		document.getElementById('drawCalls').innerHTML = renderer.drawCallCount;
-		
+
 	}
 
 	function updateScene(timeSinceLastFrame) {
@@ -130,6 +134,14 @@
    		torusRoot.visible = (value == "1");
    	}
 
+		function updateMetallic (value) {
+
+			material.metallic = parseFloat(value);
+		}
+
+		function updateRoughness (value) {
+			material.roughness = parseFloat(value);
+		}
 </script>
 
 
@@ -142,6 +154,21 @@
 		right: 10px;
 		color:red;
 	}
+
+	label {
+		display: block;
+
+	}
+
+	input, select {
+		display: block;
+		margin:3px 0px;
+	}
+
+	#controls {
+		background:white;
+		padding:4px;
+	}
 </style>
 
 </head>
@@ -151,8 +178,8 @@
 
     <canvas id="canvas" style="border: none;" width="800" height="600"></canvas>
 
-
-	<select id="debug_view" style="position:absolute;top:10px;left:10px;" onchange="onSelectChange(this.value);">
+	<div id="controls" style="position:absolute;top:10px;left:10px;">
+	<select id="debug_view"  onchange="onSelectChange(this.value);">
 		<option value="0">Full Render</option>
 		<option value="1">Compressed Depth ( Alpha amplified )</option>
 		<option value="2">Compressed Normal</option>
@@ -162,10 +189,17 @@
 		<option value="6">Decoded View Position (x 10)</option>
 	</select>
 
-	<select name="scene" onchange="onSceneSelect(this.value);" style="position: absolute;top: 40px;left:10px;">
+	<select name="scene" onchange="onSceneSelect(this.value);">
 		<option value="0">Teapots</option>
 		<option value="1">Torii</option>
 	</select>
+
+	<label>Metallic</label>
+	<input type="range" id="metallic" min="0.0" max="1.0" step="0.001" onchange="updateMetallic(this.value);" oninput="updateMetallic(this.value);">
+
+	<label>roughness</label>
+	<input type="range" id="roughness" min="0.0" max="1.0" step="0.001" onchange="updateRoughness(this.value);" oninput="updateRoughness(this.value);">
+</div>
 
 	<p id="drawCalls">
 	0

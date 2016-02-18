@@ -83,7 +83,7 @@ float decodeDepth( vec4 rgba ) {
 //     float NxH = dot(fNormal,h);
 //     float alpha2 = alpha*alpha;
 //     float t = ((NxH * NxH) * (alpha2 - 1.0) + 1.0);
-    
+
 
 
 // }
@@ -107,11 +107,11 @@ float fresnel(vec3 direction, vec3 normal, bool invert) {
     vec3 nDirection = normalize( direction );
     vec3 nNormal = normalize( normal );
     vec3 halfDirection = normalize( nNormal + nDirection );
-    
+
     float cosine = dot( halfDirection, nDirection );
     float product = max( cosine, 0.0 );
     float factor = invert ? 1.0 - pow( product, 5.0 ) : pow( product, 5.0 );
-    
+
     return factor;
 }
 
@@ -162,7 +162,7 @@ vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, v
   vec3 g_diffuse = pow(diffuse, vec3(2.2));
   vec3 g_lightColor = lightColor;
 
-  // Lerp with metallic value to find the good diffuse and specular. 
+  // Lerp with metallic value to find the good diffuse and specular.
   vec3 realAlbedo = g_diffuse - g_diffuse * metallic;
 
   // 0.03 default specular value for dielectric.
@@ -170,7 +170,7 @@ vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, v
 
   //calculate the diffuse and specular components
   vec3 albedoDiffuse = albedo(realAlbedo);
-  //vec3 specular = specular(dotNL, dotNH, dotNV, 
+  //vec3 specular = specular(dotNL, dotNH, dotNV,
   //                          dotVH, roughness, realSpecularColor, viewDir, sunDir, normal);
 
   float alpha2 = alpha*alpha;
@@ -187,9 +187,9 @@ vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, v
   vec3 specular =  D * F * G / 4.0 * dotNL * dotNV;
 
   //final result
-  vec3 finalColor = lightColor * dotNL 
+  vec3 finalColor = lightColor * dotNL
                    * (albedoDiffuse * (1.0 - specular) + specular);
-        
+
   return vec4(attenuation * (strength * finalColor), 1.0);
 
 }
@@ -254,13 +254,13 @@ void main (void) {
   }
 
   vec3 sunColor = lightColor.xyz;
-  float strength = 1.0;
-  vec3 sunDir = lightPosition.xyz;
-  float attenuation = 0.0;
+  float strength = 10.0;
+  vec3 sunDir = -lightPosition.xyz;
+  float attenuation = 1.4;
 
   //vec3 normal, vec3 diffuse, float sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic
 
-  vec3 ld = normalize(sunDir);
+  vec3 ld = normalize(-sunDir);
   vec3 vp = normalize(viewPosition);
 
   vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, ld, vp, attenuation, roughness, metallic);

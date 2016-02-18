@@ -4,8 +4,10 @@ class DFIR.Renderer
 		@debug_view = 0
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
-		@sunPosition = vec3.fromValues 30.0, 60.0, -20.0
+		@sunPosition = vec3.fromValues 30.0, 60.0, 20.0
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
+		@metallic = 1.0
+		@roughness = 0.5
 		if !canvas?
 			canvas = document.createElement 'canvas'
 			document.body.appendChild canvas
@@ -44,7 +46,7 @@ class DFIR.Renderer
 
 	enableGBuffer: () ->
 		@gbuffer.bind()
-		gl.cullFace ( gl.BACK ) 
+		gl.cullFace ( gl.BACK )
 		gl.blendFunc( gl.ONE, gl.ZERO )
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT )
 		gl.enable(gl.CULL_FACE)
@@ -63,6 +65,8 @@ class DFIR.Renderer
 		scene.root.walk (node) ->
 			if node.object?
 				if node.object.bind()
+					#gl.uniform1f(node.object.material.getUniform('metallic'), @metallic)
+					#gl.uniform1f(node.object.material.getUniform('roughness'), @roughness);
 					node.object.draw camera, node.worldMatrix
 					node.object.release()
 					dc++
@@ -109,4 +113,3 @@ class DFIR.Renderer
 		if @ready
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
-
