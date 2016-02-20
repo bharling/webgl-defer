@@ -220,6 +220,16 @@ class DFIR.TextureMapTypes
   @SPHERE = 0x05
 
 
+class DFIR.Color
+  constructor: (@r=1.0, @g=1.0, @b=1.0, @a=1.0) ->
+
+  getRGB: ->
+    vec3.fromValues @r, @g, @b
+
+  getRGBA: ->
+    vec4.fromValues @r, @g, @b, @a
+
+
 class DFIR.Shader
   constructor: (@program) ->
     @params = getShaderParams @program
@@ -266,8 +276,10 @@ class DFIR.PBRShader extends DFIR.Shader
     super( @program )
     @metallic = 0.0
     @roughness = 0.0
+    @diffuseColor = new DFIR.Color()
 
   use: ->
     gl.useProgram @program
     gl.uniform1f(@getUniform('metallic'), @metallic)
     gl.uniform1f(@getUniform('roughness'), @roughness)
+    gl.uniform3fv(@getUniform('diffuseColor'), @diffuseColor.getRGB())

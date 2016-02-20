@@ -192,10 +192,15 @@ class DFIR.Object3D
     @material.use()
     @update()
     worldMatrix ?= @transform
-    mat3.normalFromMat4 @normalMatrix, worldMatrix
+    temp = mat4.create()
+
+    mat4.multiply temp, camera.getViewMatrix(), worldMatrix
+
+    
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
+    mat3.normalFromMat4 @normalMatrix, worldMatrix
     @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
@@ -827,6 +832,16 @@ class DFIR.TextureMapTypes
   @SPHERE = 0x05
 
 
+class DFIR.Color
+  constructor: (@r=1.0, @g=1.0, @b=1.0, @a=1.0) ->
+
+  getRGB: ->
+    vec3.fromValues @r, @g, @b
+
+  getRGBA: ->
+    vec4.fromValues @r, @g, @b, @a
+
+
 class DFIR.Shader
   constructor: (@program) ->
     @params = getShaderParams @program
@@ -873,11 +888,13 @@ class DFIR.PBRShader extends DFIR.Shader
     super( @program )
     @metallic = 0.0
     @roughness = 0.0
+    @diffuseColor = new DFIR.Color()
 
   use: ->
     gl.useProgram @program
     gl.uniform1f(@getUniform('metallic'), @metallic)
     gl.uniform1f(@getUniform('roughness'), @roughness)
+    gl.uniform3fv(@getUniform('diffuseColor'), @diffuseColor.getRGB())
 
 loadJSON = (url, callback) ->
   key = md5(url)
@@ -1025,7 +1042,6 @@ class InertialVector
 
 class DFIR.Camera extends DFIR.Object3D
   constructor: (@viewportWidth, @viewportHeight) ->
-    super()
     @viewportWidth ?= gl.viewportWidth
     @viewportHeight ?= gl.viewportHeight
     @target = vec3.create()
@@ -1035,8 +1051,8 @@ class DFIR.Camera extends DFIR.Object3D
     @near = 0.01
     @far = 60.0
     @projectionMatrix = mat4.create()
-    @updateProjectionMatrix()
-    @updateViewMatrix()
+    #@updateProjectionMatrix()
+    #@updateViewMatrix()
 
   setFarClip: (@far) ->
     @updateProjectionMatrix()
@@ -1205,6 +1221,8 @@ class DFIR.FPSCamera extends DFIR.Camera
 
     @time = performance.now()/1000
 
+    console.log @position
+
   setPosition: (vec) ->
     @position.set vec[0], vec[1], vec[2]
 
@@ -1222,23 +1240,23 @@ class DFIR.FPSCamera extends DFIR.Camera
     @position.interpolate f
 
   cameraAcceleration: ->
-    acc = 100
-    vec3.set @rotVec, acc, 0, 0
-    vec3.rotateY @rotVec, @rotVec, @rotVec, -@rotation
+    # acc = 100
+    # vec3.set @rotVec, acc, 0, 0
+    # vec3.rotateY @rotVec, @rotVec, @rotVec, -@rotation
 
 
 
-    if keys.a
-      @position.accelerate -@rotVec[0], -@rotVec[1], -@rotVec[2]
-    if keys.d
-      @position.accelerate @rotVec[0], @rotVec[1], @rotVec[2]
+    # if keys.a
+    #   @position.accelerate -@rotVec[0], -@rotVec[1], -@rotVec[2]
+    # if keys.d
+    #   @position.accelerate @rotVec[0], @rotVec[1], @rotVec[2]
 
-    vec3.set @rotVec, 0, 0, acc
-    vec3.rotateY @rotVec, @rotVec, @rotVec, -@rotation
-    if keys.w
-      @position.accelerate -@rotVec[0], -@rotVec[1], -@rotVec[2]
-    if keys.s
-      @position.accelerate @rotVec[0], @rotVec[1], @rotVec[2]
+    # vec3.set @rotVec, 0, 0, acc
+    # vec3.rotateY @rotVec, @rotVec, @rotVec, -@rotation
+    # if keys.w
+    #   @position.accelerate -@rotVec[0], -@rotVec[1], -@rotVec[2]
+    # if keys.s
+    #   @position.accelerate @rotVec[0], @rotVec[1], @rotVec[2]
 
   update: ->
     @cameraAcceleration()
@@ -1252,6 +1270,95 @@ class DFIR.FPSCamera extends DFIR.Camera
       pos = vec3.fromValues( @position.x.display, @position.y.display, @position.z.display )
       
       mat4.translate @viewMatrix, @viewMatrix, pos
+
+
+
+class DFIR.QuaternionCamera extends DFIR.Camera
+  constructor: (@viewportWidth, @viewportHeight, @canvas) ->
+    super(@viewportWidth, @viewportHeight)
+    @sensitivity = 200.0
+    @pointer = new Pointer( @canvas, @pointerMove )
+    @rotx = 0.0
+    @up = vec3.fromValues 0.0, 1.0, 0.0
+    @view = vec3.fromValues 0.0, 0.0, 1.0
+    @dt = 1/24
+    @position = new InertialVector 0, 0, 0, 0.05, @dt
+    @time = performance.now()/1000
+
+  pointerMove: (x, y, dx, dy) =>
+    if @pointer.pressed
+      rotx = 0.0
+      mx = dx / @sensitivity
+      my = dy / @sensitivity
+      @rotx += my
+      pos = vec3.fromValues @position.x.display, @position.y.display, @position.z.display
+      axis = vec3.create()
+      vp = vec3.create()
+      vec3.subtract(vp, @view, pos )
+      vec3.cross(axis, vp, @up)
+      vec3.normalize(axis, axis)
+      @rotateCamera my, axis[0], axis[1], axis[2]
+      @rotateCamera mx, 0.0, 1.0, 0.0
+
+  rotateCamera: (angle, x, y, z) =>
+    quat_view = quat.create()
+    result = quat.create()
+    tv = quat.create()
+    tc = quat.create()
+    temp = quat.fromValues x * Math.sin(angle/2), y * Math.sin(angle/2), z * Math.sin(angle/2), Math.cos(angle/2)
+    quat_view = quat.fromValues @view[0], @view[1], @view[2], 0.0
+    quat.multiply tv, temp, quat_view
+    quat.conjugate temp, temp
+    quat.multiply result, tv, temp
+    vec3.set @view, result[0], result[1], result[2]
+
+  updateViewMatrix: () ->
+    target = vec3.fromValues @position.x.display, @position.y.display, @position.z.display
+    look = vec3.clone @view
+    #vec3.scale look, @view, 100.0
+    vec3.add target, target, look
+    mat4.lookAt @viewMatrix, [@position.x.display, @position.y.display, @position.z.display], target, @up
+
+  getViewMatrix: () ->
+    @viewMatrix
+
+  getViewRotationMatrix: () ->
+    vrMatrix = mat4.create()
+    mat4.lookAt vrMatrix, [0.0, 0.0, 0.0], @view, @up
+    vrMatrix
+
+  setPosition: (vec) ->
+    @position.set vec[0], vec[1], vec[2]
+
+  step: ->
+    now = performance.now()/1000
+    while @time < now
+      @time += @dt
+      @position.integrate()
+    f = (@time - now)/@dt
+    @position.interpolate f
+
+  cameraAcceleration: ->
+    acc = 300.0
+    vel = vec3.clone @view
+    vec3.scale vel, vel, acc
+    if keys.s
+      @position.accelerate -vel[0], -vel[1], -vel[2]
+    if keys.w
+      @position.accelerate vel[0], vel[1], vel[2]
+
+    vec3.cross vel, @view, @up
+    vec3.scale vel, vel, acc
+
+    if keys.a
+      @position.accelerate -vel[0], -vel[1], -vel[2]
+    if keys.d
+      @position.accelerate vel[0], vel[1], vel[2]
+
+  update: ->
+    @cameraAcceleration()
+    @step()
+
 
 class DFIR.DirectionalLight extends DFIR.Object3D
 
@@ -1681,7 +1788,7 @@ class DFIR.Renderer
 		@debug_view = 0
 		@width = if canvas then canvas.width else 1280
 		@height = if canvas then canvas.height else 720
-		@sunPosition = vec3.fromValues 30.0, 60.0, 20.0
+		@sunPosition = vec3.fromValues -1.0, 0.0, 0.0
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
 		@metallic = 1.0
 		@roughness = 0.5
@@ -1770,6 +1877,8 @@ class DFIR.Renderer
 		gl.uniform1i(@quad.material.getUniform('depthTexture'), 0)
 		gl.uniform1i(@quad.material.getUniform('normalsTexture'), 1)
 		gl.uniform1i(@quad.material.getUniform('albedoTexture'), 2)
+		gl.uniformMatrix4fv(@quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix())
+		gl.uniformMatrix4fv(@quad.material.getUniform('uViewRotationMatrix'), false, camera.getViewMatrix())		
 
 		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
 		gl.uniform3fv(@quad.material.getUniform('lightColor'), @sunColor)
@@ -1779,6 +1888,7 @@ class DFIR.Renderer
 		#sunLight.bind(@quad.material.uniforms)
 
 		gl.uniformMatrix4fv(@quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix())
+		gl.uniformMatrix4fv(@quad.material.getUniform('inverseViewProjectionMatrix'), false, camera.getInverseViewProjectionMatrix())
 
 		#gl.uniform4f(@quad.material.getUniform('projectionParams'), projectionParams[0], projectionParams[1], projectionParams[2], projectionParams[3] )
 

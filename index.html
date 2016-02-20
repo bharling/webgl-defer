@@ -6,6 +6,8 @@
 
 <script type="text/javascript" src="js/glMatrix.min.js"></script>
 <script type="text/javascript" src="js/md5.js"></script>
+<script src="js/suncalc.js" type="text/javascript" charset="utf-8"></script>
+<script src="js/dat.gui.min.js" type="text/javascript" charset="utf-8"></script>
 
 
 <style type="text/css">
@@ -21,9 +23,20 @@
 
 <script type="text/javascript">
 
-	var scene, renderer, camera, canvas, potsRoot, torusRoot, material, lastTime = 0, elapsed = 0;
+	var scene, renderer, camera, canvas, potsRoot, torusRoot, material, gui, lastTime = 0, elapsed = 0, times;
+
+	
+
+
+	
 
 	function webGLStart() {
+
+		times = SunCalc.getTimes(new Date(), 51.5 -0.1);
+		console.log(times.sunrise);
+
+
+		gui = new dat.GUI();
 		canvas = document.getElementById("canvas");
 
 		try {
@@ -43,8 +56,21 @@
 
 		scene = new DFIR.Scene();
 		renderer = new DFIR.Renderer(canvas);
-		camera = new DFIR.FPSCamera(gl.drawingBufferWidth, gl.drawingBufferHeight, canvas)
-		camera.setPosition(vec3.fromValues( 0.0, -40.0, -100.0 ));
+
+		gui.add(renderer, 'debug_view', 
+		{ 	'Full Render':0, 
+			'Depth':1, 
+			'Compressed Normal':2, 
+			'Albedo':3, 
+			'Decompressed Normal':4, 
+			'Metallic / Roughness': 5, 
+			'View Space Position':6 }
+		);
+		gui.add(renderer, 'exposure', 0.0, 60.0);
+		//gui.add(this, "times");
+
+		camera = new DFIR.QuaternionCamera(gl.drawingBufferWidth, gl.drawingBufferHeight, canvas)
+		camera.setPosition(vec3.fromValues( 0.0, 0.0, -100.0 ));
 		camera.setNearClip(1.0);
 		camera.setFarClip(100000.0);
 
@@ -52,7 +78,6 @@
 		var spacing = 37;
 		var size = numPots * spacing;
 		var tl = -(size / 2) + (spacing/2);
-		console.log (tl);
 
 		torusRoot = new DFIR.SceneNode();
 		potsRoot = new DFIR.SceneNode();
@@ -65,9 +90,16 @@
 			//material.normalMapLoaded = true;
 			material.showInfo();
 
-			material.roughness = 0.0;
+			material.roughness = 0.3;
 			material.metallic = 0.6;
 
+			gui.add(material, 'metallic', 0.0, 1.0);
+			gui.add(material, 'roughness', 0.0, 1.0);
+
+
+			gui.add(material.diffuseColor, 'r', 0.0, 1.0);
+			gui.add(material.diffuseColor, 'g', 0.0, 1.0);
+			gui.add(material.diffuseColor, 'b', 0.0, 1.0);
 
 			torusRoot.setParent(scene.root);
 			potsRoot.setParent(scene.root);
@@ -100,7 +132,17 @@
 
 		});
 		//window.onSceneSelect("0");
-		tick()
+
+
+
+
+		
+
+
+
+
+		tick();
+
 	}
 
 	function tick () {
@@ -118,7 +160,7 @@
 
 	function updateScene(timeSinceLastFrame) {
 		camera.update();
-		scene.root.rotateY(0.0005 * timeSinceLastFrame);
+		//scene.root.rotateY(0.0005 * timeSinceLastFrame);
 	}
 
 	function drawScene() {
@@ -134,18 +176,8 @@
    		torusRoot.visible = (value == "1");
    	}
 
-		function updateMetallic (value) {
 
-			material.metallic = parseFloat(value);
-		}
 
-		function updateRoughness (value) {
-			material.roughness = parseFloat(value);
-		}
-
-		function updateExposure( value ) {
-			renderer.exposure = value;
-		}
 </script>
 
 
@@ -182,31 +214,6 @@
 
     <canvas id="canvas" style="border: none;" width="800" height="600"></canvas>
 
-	<div id="controls" style="position:absolute;top:10px;left:10px;">
-	<select id="debug_view"  onchange="onSelectChange(this.value);">
-		<option value="0">Full Render</option>
-		<option value="1">Compressed Depth ( Alpha amplified )</option>
-		<option value="2">Compressed Normal</option>
-		<option value="3">Albedo</option>
-		<option value="4">Decoded Depth Buffer</option>
-		<option value="5">Decoded Normals</option>
-		<option value="6">Decoded View Position (x 10)</option>
-	</select>
-
-	<select name="scene" onchange="onSceneSelect(this.value);">
-		<option value="0">Teapots</option>
-		<option value="1">Torii</option>
-	</select>
-
-	<label>Metallic</label>
-	<input type="range" id="metallic" min="0.0" max="1.0" step="0.001" onchange="updateMetallic(this.value);" oninput="updateMetallic(this.value);">
-
-	<label>roughness</label>
-	<input type="range" id="roughness" min="0.0" max="1.0" step="0.001" onchange="updateRoughness(this.value);" oninput="updateRoughness(this.value);">
-
-<label>Exposure</label>
-<input type="range" id="exposure" min="0.0" max="40.0" step="0.001" onchange="updateExposure(this.value);" oninput="updateExposure(this.value);">
-</div>
 
 	<p id="drawCalls">
 	0

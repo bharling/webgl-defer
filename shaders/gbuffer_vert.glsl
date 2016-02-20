@@ -20,10 +20,11 @@ attribute vec2 aVertexTextureCoords;
       gl_Position = uWorldViewProjectionMatrix * vec4(aVertexPosition, 1.0);
 
       gl_Position.z = log(C* gl_Position.z + 1.0) / log(C*farClip + 1.0) * gl_Position.w;
+      vEyeDirection = -gl_Position.xyz;
       //gl_Position.z = log(gl_Position.z / nearClip) / log(farClip / nearClip);
       //depthClipSpace = gl_Position.zw;
       
-      vNormal = uNormalMatrix * aVertexNormal;
       vNormal = aVertexNormal;
-      vEyeDirection = -gl_Position.xyz;
+      //vNormal = aVertexNormal;
+      
   }

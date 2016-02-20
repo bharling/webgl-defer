@@ -7,7 +7,9 @@ uniform sampler2D albedoTexture;
 
 //uniform vec4 projectionParams;
 uniform mat4 inverseProjectionMatrix;
+uniform mat4 inverseViewProjectionMatrix;
 uniform mat4 uViewMatrix;
+uniform mat4 uViewRotationMatrix;
 
 // Directional Light
 uniform vec3 lightPosition;
@@ -45,7 +47,7 @@ vec3 reconstructViewSpacePosition( float depth, vec2 texcoord ) {
   clipSpaceLocation.y = texcoord.y * 2.0 - 1.0;
   clipSpaceLocation.z = depth * 2.0 - 1.0;
   clipSpaceLocation.w = 1.0;
-  vec4 homogenousLocation = inverseProjectionMatrix * clipSpaceLocation;
+  vec4 homogenousLocation = inverseViewProjectionMatrix * clipSpaceLocation;
   return homogenousLocation.xyz / homogenousLocation.w;
 }
 
@@ -91,6 +93,7 @@ float decodeDepth( vec4 rgba ) {
 
 vec3 Gsub(vec3 v, vec3 fNormal, float roughness) // Sub Function of G
 {
+    //v = -v;
     float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
     return vec3(dot(fNormal, v) / ((dot(fNormal, v)) * (1.0 - k) + k));
 }
@@ -149,7 +152,7 @@ float saturate ( float v ) {
 vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic) {
 
 
-  vec3 H = normalize(viewDir+sunDir);
+  vec3 H = normalize(normalize(viewDir)+normalize(sunDir));
 
 
   float dotNL = saturate(dot(normal, sunDir));
@@ -238,22 +241,26 @@ void main (void) {
 
   float decodedDepth = decodeDepth(depthSample);
 
+  vec4 decodedNormal = vec4(decodeNormal(normalsSample.xy),1.0);
+  float metallic = normalsSample.z;
+  float roughness = normalsSample.w;
+
   if (DEBUG == 4.0) {
-  	gl_FragColor = vec4(decodedDepth, decodedDepth, decodedDepth, 1.0);
+    gl_FragColor = decodedNormal;
+    return;
+  }
+
+  if (DEBUG == 5.0) {
+  	gl_FragColor = vec4(metallic, roughness, 1.0, 1.0);
   	return;
   }
 
 
   // vec4 decodedNormal = vec4(normalsSample.xyz * 2.0 - 1.0, 1.0 ); //vec4(decodeNormal(  normalsSample ), 1.0);
 
-  vec4 decodedNormal = vec4(decodeNormal(normalsSample.xy),1.0);
-  float metallic = normalsSample.z;
-  float roughness = normalsSample.w;
+  
 
-  if (DEBUG == 5.0) {
-  	gl_FragColor = decodedNormal;
-  	return;
-  }
+
 
 
   vec3 viewPosition = reconstructViewSpacePosition( depthSample.r, vTexCoords );
@@ -264,18 +271,18 @@ void main (void) {
   }
 
   vec3 sunColor = lightColor.xyz;
-  float strength = 1.0;
-  vec3 sunDir = -lightPosition.xyz;
-  float attenuation = 0.2;
+  float strength = 1.5;
+  vec3 sunDir = lightPosition; //normalize(uViewRotationMatrix * vec4(-lightPosition.xyz, 1.0)).xyz;
+  float attenuation = 0.6;
 
   //vec3 normal, vec3 diffuse, float sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic
 
-  vec3 ld = normalize(-sunDir);
+  vec3 ld = normalize(sunDir);
   vec3 vp = normalize(viewPosition);
 
   vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, ld, vp, attenuation, roughness, metallic);
 
-  color += vec4(0.0001, 0.0001, 0.0002, 0.0);
+  //color += vec4(0.0001, 0.0001, 0.0002, 0.0);
 
   gl_FragColor = reinhardt( color );
 

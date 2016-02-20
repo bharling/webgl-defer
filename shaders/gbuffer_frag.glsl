@@ -12,6 +12,8 @@
   uniform sampler2D diffuseTex;
   uniform sampler2D normalTex;
 
+  uniform vec3 diffuseColor;
+
 
   uniform float metallic;
   uniform float roughness;
@@ -86,7 +88,7 @@
   void main (void) {
     vec3 N = normalize(uNormalMatrix * vNormal);
 
-    // N = perturb_normal(N, vEyeDirection, vTexCoords );
+    N = perturb_normal(N, vEyeDirection, vTexCoords );
 
     //float metallic = 0.6;
     //float roughness = 0.6;
@@ -95,6 +97,8 @@
 
   	vec4 n = encodeNormal( N );
 
-    gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
+    //gl_FragData[0] = texture2D( diffuseTex, vTexCoords);
+    gl_FragData[0] = vec4(diffuseColor, 1.0);
+    //gl_FragData[1] = vec4(N.x, N.y, N.z, 1.0);
     gl_FragData[1] = vec4( n.xy, metallic, roughness );
   }

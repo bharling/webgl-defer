@@ -197,7 +197,7 @@ THE SOFTWARE.
     };
 
     Object3D.prototype.draw = function(camera, worldMatrix) {
-      var worldViewProjectionMatrix;
+      var temp, worldViewProjectionMatrix;
       if (!this.material || !this.loaded) {
         return;
       }
@@ -206,10 +206,12 @@ THE SOFTWARE.
       if (worldMatrix == null) {
         worldMatrix = this.transform;
       }
-      mat3.normalFromMat4(this.normalMatrix, worldMatrix);
+      temp = mat4.create();
+      mat4.multiply(temp, camera.getViewMatrix(), worldMatrix);
       worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix);
+      mat3.normalFromMat4(this.normalMatrix, worldMatrix);
       this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
@@ -975,6 +977,26 @@ THE SOFTWARE.
 
   })();
 
+  DFIR.Color = (function() {
+    function Color(r, g, b1, a1) {
+      this.r = r != null ? r : 1.0;
+      this.g = g != null ? g : 1.0;
+      this.b = b1 != null ? b1 : 1.0;
+      this.a = a1 != null ? a1 : 1.0;
+    }
+
+    Color.prototype.getRGB = function() {
+      return vec3.fromValues(this.r, this.g, this.b);
+    };
+
+    Color.prototype.getRGBA = function() {
+      return vec4.fromValues(this.r, this.g, this.b, this.a);
+    };
+
+    return Color;
+
+  })();
+
   DFIR.Shader = (function() {
     function Shader(program1) {
       this.program = program1;
@@ -1056,12 +1078,14 @@ THE SOFTWARE.
       PBRShader.__super__.constructor.call(this, this.program);
       this.metallic = 0.0;
       this.roughness = 0.0;
+      this.diffuseColor = new DFIR.Color();
     }
 
     PBRShader.prototype.use = function() {
       gl.useProgram(this.program);
       gl.uniform1f(this.getUniform('metallic'), this.metallic);
-      return gl.uniform1f(this.getUniform('roughness'), this.roughness);
+      gl.uniform1f(this.getUniform('roughness'), this.roughness);
+      return gl.uniform3fv(this.getUniform('diffuseColor'), this.diffuseColor.getRGB());
     };
 
     return PBRShader;
@@ -1246,7 +1270,6 @@ THE SOFTWARE.
     function Camera(viewportWidth, viewportHeight) {
       this.viewportWidth = viewportWidth;
       this.viewportHeight = viewportHeight;
-      Camera.__super__.constructor.call(this);
       if (this.viewportWidth == null) {
         this.viewportWidth = gl.viewportWidth;
       }
@@ -1260,8 +1283,6 @@ THE SOFTWARE.
       this.near = 0.01;
       this.far = 60.0;
       this.projectionMatrix = mat4.create();
-      this.updateProjectionMatrix();
-      this.updateViewMatrix();
     }
 
     Camera.prototype.setFarClip = function(far) {
@@ -1442,6 +1463,7 @@ THE SOFTWARE.
       this.dt = 1 / 24;
       this.position = new InertialVector(0, 0, 0, 0.05, this.dt);
       this.time = performance.now() / 1000;
+      console.log(this.position);
     }
 
     FPSCamera.prototype.setPosition = function(vec) {
@@ -1466,26 +1488,7 @@ THE SOFTWARE.
       return this.position.interpolate(f);
     };
 
-    FPSCamera.prototype.cameraAcceleration = function() {
-      var acc;
-      acc = 100;
-      vec3.set(this.rotVec, acc, 0, 0);
-      vec3.rotateY(this.rotVec, this.rotVec, this.rotVec, -this.rotation);
-      if (keys.a) {
-        this.position.accelerate(-this.rotVec[0], -this.rotVec[1], -this.rotVec[2]);
-      }
-      if (keys.d) {
-        this.position.accelerate(this.rotVec[0], this.rotVec[1], this.rotVec[2]);
-      }
-      vec3.set(this.rotVec, 0, 0, acc);
-      vec3.rotateY(this.rotVec, this.rotVec, this.rotVec, -this.rotation);
-      if (keys.w) {
-        this.position.accelerate(-this.rotVec[0], -this.rotVec[1], -this.rotVec[2]);
-      }
-      if (keys.s) {
-        return this.position.accelerate(this.rotVec[0], this.rotVec[1], this.rotVec[2]);
-      }
-    };
+    FPSCamera.prototype.cameraAcceleration = function() {};
 
     FPSCamera.prototype.update = function() {
       this.cameraAcceleration();
@@ -1504,6 +1507,122 @@ THE SOFTWARE.
     };
 
     return FPSCamera;
+
+  })(DFIR.Camera);
+
+  DFIR.QuaternionCamera = (function(superClass) {
+    extend(QuaternionCamera, superClass);
+
+    function QuaternionCamera(viewportWidth, viewportHeight, canvas1) {
+      this.viewportWidth = viewportWidth;
+      this.viewportHeight = viewportHeight;
+      this.canvas = canvas1;
+      this.rotateCamera = bind(this.rotateCamera, this);
+      this.pointerMove = bind(this.pointerMove, this);
+      QuaternionCamera.__super__.constructor.call(this, this.viewportWidth, this.viewportHeight);
+      this.sensitivity = 200.0;
+      this.pointer = new Pointer(this.canvas, this.pointerMove);
+      this.rotx = 0.0;
+      this.up = vec3.fromValues(0.0, 1.0, 0.0);
+      this.view = vec3.fromValues(0.0, 0.0, 1.0);
+      this.dt = 1 / 24;
+      this.position = new InertialVector(0, 0, 0, 0.05, this.dt);
+      this.time = performance.now() / 1000;
+    }
+
+    QuaternionCamera.prototype.pointerMove = function(x, y, dx, dy) {
+      var axis, mx, my, pos, rotx, vp;
+      if (this.pointer.pressed) {
+        rotx = 0.0;
+        mx = dx / this.sensitivity;
+        my = dy / this.sensitivity;
+        this.rotx += my;
+        pos = vec3.fromValues(this.position.x.display, this.position.y.display, this.position.z.display);
+        axis = vec3.create();
+        vp = vec3.create();
+        vec3.subtract(vp, this.view, pos);
+        vec3.cross(axis, vp, this.up);
+        vec3.normalize(axis, axis);
+        this.rotateCamera(my, axis[0], axis[1], axis[2]);
+        return this.rotateCamera(mx, 0.0, 1.0, 0.0);
+      }
+    };
+
+    QuaternionCamera.prototype.rotateCamera = function(angle, x, y, z) {
+      var quat_view, result, tc, temp, tv;
+      quat_view = quat.create();
+      result = quat.create();
+      tv = quat.create();
+      tc = quat.create();
+      temp = quat.fromValues(x * Math.sin(angle / 2), y * Math.sin(angle / 2), z * Math.sin(angle / 2), Math.cos(angle / 2));
+      quat_view = quat.fromValues(this.view[0], this.view[1], this.view[2], 0.0);
+      quat.multiply(tv, temp, quat_view);
+      quat.conjugate(temp, temp);
+      quat.multiply(result, tv, temp);
+      return vec3.set(this.view, result[0], result[1], result[2]);
+    };
+
+    QuaternionCamera.prototype.updateViewMatrix = function() {
+      var look, target;
+      target = vec3.fromValues(this.position.x.display, this.position.y.display, this.position.z.display);
+      look = vec3.clone(this.view);
+      vec3.add(target, target, look);
+      return mat4.lookAt(this.viewMatrix, [this.position.x.display, this.position.y.display, this.position.z.display], target, this.up);
+    };
+
+    QuaternionCamera.prototype.getViewMatrix = function() {
+      return this.viewMatrix;
+    };
+
+    QuaternionCamera.prototype.getViewRotationMatrix = function() {
+      var vrMatrix;
+      vrMatrix = mat4.create();
+      mat4.lookAt(vrMatrix, [0.0, 0.0, 0.0], this.view, this.up);
+      return vrMatrix;
+    };
+
+    QuaternionCamera.prototype.setPosition = function(vec) {
+      return this.position.set(vec[0], vec[1], vec[2]);
+    };
+
+    QuaternionCamera.prototype.step = function() {
+      var f, now;
+      now = performance.now() / 1000;
+      while (this.time < now) {
+        this.time += this.dt;
+        this.position.integrate();
+      }
+      f = (this.time - now) / this.dt;
+      return this.position.interpolate(f);
+    };
+
+    QuaternionCamera.prototype.cameraAcceleration = function() {
+      var acc, vel;
+      acc = 300.0;
+      vel = vec3.clone(this.view);
+      vec3.scale(vel, vel, acc);
+      if (keys.s) {
+        this.position.accelerate(-vel[0], -vel[1], -vel[2]);
+      }
+      if (keys.w) {
+        this.position.accelerate(vel[0], vel[1], vel[2]);
+      }
+      vec3.cross(vel, this.view, this.up);
+      vec3.scale(vel, vel, acc);
+      if (keys.a) {
+        this.position.accelerate(-vel[0], -vel[1], -vel[2]);
+      }
+      if (keys.d) {
+        return this.position.accelerate(vel[0], vel[1], vel[2]);
+      }
+    };
+
+    QuaternionCamera.prototype.update = function() {
+      this.cameraAcceleration();
+      return this.step();
+    };
+
+    return QuaternionCamera;
 
   })(DFIR.Camera);
 
@@ -1912,7 +2031,7 @@ THE SOFTWARE.
       this.debug_view = 0;
       this.width = canvas ? canvas.width : 1280;
       this.height = canvas ? canvas.height : 720;
-      this.sunPosition = vec3.fromValues(30.0, 60.0, 20.0);
+      this.sunPosition = vec3.fromValues(-1.0, 0.0, 0.0);
       this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
       this.metallic = 1.0;
       this.roughness = 0.5;
@@ -1995,10 +2114,13 @@ THE SOFTWARE.
       gl.uniform1i(this.quad.material.getUniform('depthTexture'), 0);
       gl.uniform1i(this.quad.material.getUniform('normalsTexture'), 1);
       gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
+      gl.uniformMatrix4fv(this.quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
+      gl.uniformMatrix4fv(this.quad.material.getUniform('uViewRotationMatrix'), false, camera.getViewMatrix());
       gl.uniform3fv(this.quad.material.getUniform('lightPosition'), this.sunPosition);
       gl.uniform3fv(this.quad.material.getUniform('lightColor'), this.sunColor);
       gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
+      gl.uniformMatrix4fv(this.quad.material.getUniform('inverseViewProjectionMatrix'), false, camera.getInverseViewProjectionMatrix());
       gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
       return this.quad.release();
