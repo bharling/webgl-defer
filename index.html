@@ -69,8 +69,8 @@
 		gui.add(renderer, 'exposure', 0.0, 60.0);
 		//gui.add(this, "times");
 
-		camera = new DFIR.QuaternionCamera(gl.drawingBufferWidth, gl.drawingBufferHeight, canvas)
-		camera.setPosition(vec3.fromValues( 0.0, 0.0, -100.0 ));
+		camera = new DFIR.QuaternionCamera(canvas.clientWidth, canvas.clientHeight, canvas)
+		camera.setPosition(vec3.fromValues( 0.0, 100.0, -100.0 ));
 		camera.setNearClip(1.0);
 		camera.setFarClip(100000.0);
 
