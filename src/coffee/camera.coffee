@@ -85,6 +85,10 @@ class DFIR.Camera extends DFIR.Object3D
   getProjectionMatrix: ->
     @projectionMatrix
 
+  getViewProjectionMatrix: ->
+    temp = mat4.create()
+    mat4.multiply temp, @projectionMatrix, @viewMatrix
+    temp
 
   getFrustumCorners: ->
     v = vec3.create()

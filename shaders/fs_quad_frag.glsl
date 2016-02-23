@@ -9,10 +9,10 @@ uniform sampler2D albedoTexture;
 uniform mat4 inverseProjectionMatrix;
 uniform mat4 inverseViewProjectionMatrix;
 uniform mat4 uViewMatrix;
-uniform mat4 uViewRotationMatrix;
+uniform mat4 uViewProjectionMatrix;
 
 // Directional Light
-uniform vec3 lightPosition;
+uniform vec3 lightDirection;
 uniform vec3 lightColor;
 uniform float exposure;
 
@@ -47,7 +47,7 @@ vec3 reconstructViewSpacePosition( float depth, vec2 texcoord ) {
   clipSpaceLocation.y = texcoord.y * 2.0 - 1.0;
   clipSpaceLocation.z = depth * 2.0 - 1.0;
   clipSpaceLocation.w = 1.0;
-  vec4 homogenousLocation = inverseViewProjectionMatrix * clipSpaceLocation;
+  vec4 homogenousLocation = inverseProjectionMatrix * clipSpaceLocation;
   return homogenousLocation.xyz / homogenousLocation.w;
 }
 
@@ -149,13 +149,12 @@ float saturate ( float v ) {
   return clamp(v, 0.0, 1.0);
 }
 
-vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic) {
+vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, vec3 viewSunDir, vec3 viewDir, float attenuation, float roughness, float metallic) {
+
+  vec3 H = normalize(viewSunDir + viewDir);
 
 
-  vec3 H = normalize(normalize(viewDir)+normalize(sunDir));
-
-
-  float dotNL = saturate(dot(normal, sunDir));
+  float dotNL = saturate(dot(normal, viewSunDir));
 
   float dotNH = saturate(dot(normal, H));
   float dotNV = saturate(dot(normal, viewDir));
@@ -186,7 +185,7 @@ vec4 computeLighting(vec3 normal, vec3 diffuse, vec3 sunColor, float strength, v
   float product = max(dotNH, 0.0);
   float F = pow( product, 5.0 );
 
-  vec3 G = Gsub( sunDir, normal, roughness ) * Gsub( viewDir, normal, roughness );
+  vec3 G = Gsub( viewSunDir, normal, roughness ) * Gsub( viewDir, normal, roughness );
 
   vec3 specular =  D * F * G / 4.0 * dotNL * dotNV;
 
@@ -272,15 +271,15 @@ void main (void) {
 
   vec3 sunColor = lightColor.xyz;
   float strength = 1.5;
-  vec3 sunDir = lightPosition; //normalize(uViewRotationMatrix * vec4(-lightPosition.xyz, 1.0)).xyz;
-  float attenuation = 0.6;
+  vec3 sunDir = normalize(uViewMatrix * vec4(lightDirection, 0.0)).xyz; //normalize(uViewRotationMatrix * vec4(-lightPosition.xyz, 1.0)).xyz;
+  float attenuation = 1.0;
 
   //vec3 normal, vec3 diffuse, float sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic
 
-  vec3 ld = normalize(sunDir);
-  vec3 vp = normalize(viewPosition);
+  //vec3 ld = normalize(sunDir);
+  vec3 viewDirection = -normalize(viewPosition);
 
-  vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, ld, vp, attenuation, roughness, metallic);
+  vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, sunDir, viewDirection, attenuation, roughness, metallic);
 
   //color += vec4(0.0001, 0.0001, 0.0002, 0.0);
 

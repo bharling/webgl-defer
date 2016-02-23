@@ -211,7 +211,7 @@ THE SOFTWARE.
       worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
       mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix);
-      mat3.normalFromMat4(this.normalMatrix, worldMatrix);
+      mat3.normalFromMat4(this.normalMatrix, temp);
       this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
@@ -949,7 +949,7 @@ THE SOFTWARE.
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex.image);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
@@ -1301,6 +1301,13 @@ THE SOFTWARE.
 
     Camera.prototype.getProjectionMatrix = function() {
       return this.projectionMatrix;
+    };
+
+    Camera.prototype.getViewProjectionMatrix = function() {
+      var temp;
+      temp = mat4.create();
+      mat4.multiply(temp, this.projectionMatrix, this.viewMatrix);
+      return temp;
     };
 
     Camera.prototype.getFrustumCorners = function() {
@@ -2029,9 +2036,9 @@ THE SOFTWARE.
     function Renderer(canvas) {
       this.ready = false;
       this.debug_view = 0;
-      this.width = canvas ? canvas.width : 1280;
-      this.height = canvas ? canvas.height : 720;
-      this.sunPosition = vec3.fromValues(-1.0, 0.0, 0.0);
+      this.width = canvas ? canvas.width : window.innerWidth;
+      this.height = canvas ? canvas.height : window.innerHeight;
+      this.sunDirection = vec3.fromValues(-1.0, 1.0, 0.0);
       this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
       this.metallic = 1.0;
       this.roughness = 0.5;
@@ -2115,8 +2122,8 @@ THE SOFTWARE.
       gl.uniform1i(this.quad.material.getUniform('normalsTexture'), 1);
       gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
       gl.uniformMatrix4fv(this.quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
-      gl.uniformMatrix4fv(this.quad.material.getUniform('uViewRotationMatrix'), false, camera.getViewMatrix());
-      gl.uniform3fv(this.quad.material.getUniform('lightPosition'), this.sunPosition);
+      gl.uniformMatrix4fv(this.quad.material.getUniform('uViewProjectionMatrix'), false, camera.getViewProjectionMatrix());
+      gl.uniform3fv(this.quad.material.getUniform('lightDirection'), this.sunDirection);
       gl.uniform3fv(this.quad.material.getUniform('lightColor'), this.sunColor);
       gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());

@@ -194,13 +194,13 @@ class DFIR.Object3D
     worldMatrix ?= @transform
     temp = mat4.create()
 
-    mat4.multiply temp, camera.getViewMatrix(), worldMatrix
+    mat4.multiply temp, camera.getViewMatrix() , worldMatrix
 
     
     worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
-    mat3.normalFromMat4 @normalMatrix, worldMatrix
+    mat3.normalFromMat4 @normalMatrix, temp
     @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
@@ -814,7 +814,7 @@ loadTexture = (url, callback) ->
     gl.bindTexture gl.TEXTURE_2D, tex
     gl.pixelStorei gl.UNPACK_FLIP_Y_WEBGL, true
     gl.texImage2D gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex.image
-    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST
+    gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR
     gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST
     gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT
     gl.texParameteri gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT
@@ -1066,6 +1066,10 @@ class DFIR.Camera extends DFIR.Object3D
   getProjectionMatrix: ->
     @projectionMatrix
 
+  getViewProjectionMatrix: ->
+    temp = mat4.create()
+    mat4.multiply temp, @projectionMatrix, @viewMatrix
+    temp
 
   getFrustumCorners: ->
     v = vec3.create()
@@ -1786,9 +1790,9 @@ class DFIR.Renderer
 	constructor: (canvas) ->
 		@ready = false
 		@debug_view = 0
-		@width = if canvas then canvas.width else 1280
-		@height = if canvas then canvas.height else 720
-		@sunPosition = vec3.fromValues -1.0, 0.0, 0.0
+		@width = if canvas then canvas.width else window.innerWidth
+		@height = if canvas then canvas.height else window.innerHeight
+		@sunDirection = vec3.fromValues -1.0, 1.0, 0.0
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
 		@metallic = 1.0
 		@roughness = 0.5
@@ -1878,9 +1882,9 @@ class DFIR.Renderer
 		gl.uniform1i(@quad.material.getUniform('normalsTexture'), 1)
 		gl.uniform1i(@quad.material.getUniform('albedoTexture'), 2)
 		gl.uniformMatrix4fv(@quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix())
-		gl.uniformMatrix4fv(@quad.material.getUniform('uViewRotationMatrix'), false, camera.getViewMatrix())		
+		gl.uniformMatrix4fv(@quad.material.getUniform('uViewProjectionMatrix'), false, camera.getViewProjectionMatrix())		
 
-		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
+		gl.uniform3fv(@quad.material.getUniform('lightDirection'), @sunDirection)
 		gl.uniform3fv(@quad.material.getUniform('lightColor'), @sunColor)
 		gl.uniform1f(@quad.material.getUniform('exposure'), @exposure)
 		#console.log(sunLight.position)

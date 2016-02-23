@@ -2,9 +2,9 @@ class DFIR.Renderer
 	constructor: (canvas) ->
 		@ready = false
 		@debug_view = 0
-		@width = if canvas then canvas.width else 1280
-		@height = if canvas then canvas.height else 720
-		@sunPosition = vec3.fromValues -1.0, 0.0, 0.0
+		@width = if canvas then canvas.width else window.innerWidth
+		@height = if canvas then canvas.height else window.innerHeight
+		@sunDirection = vec3.fromValues -1.0, 1.0, 0.0
 		@sunColor = vec3.fromValues 1.0, 1.0, 1.0
 		@metallic = 1.0
 		@roughness = 0.5
@@ -94,9 +94,9 @@ class DFIR.Renderer
 		gl.uniform1i(@quad.material.getUniform('normalsTexture'), 1)
 		gl.uniform1i(@quad.material.getUniform('albedoTexture'), 2)
 		gl.uniformMatrix4fv(@quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix())
-		gl.uniformMatrix4fv(@quad.material.getUniform('uViewRotationMatrix'), false, camera.getViewMatrix())		
+		gl.uniformMatrix4fv(@quad.material.getUniform('uViewProjectionMatrix'), false, camera.getViewProjectionMatrix())		
 
-		gl.uniform3fv(@quad.material.getUniform('lightPosition'), @sunPosition)
+		gl.uniform3fv(@quad.material.getUniform('lightDirection'), @sunDirection)
 		gl.uniform3fv(@quad.material.getUniform('lightColor'), @sunColor)
 		gl.uniform1f(@quad.material.getUniform('exposure'), @exposure)
 		#console.log(sunLight.position)
