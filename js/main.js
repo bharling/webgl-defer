@@ -185,6 +185,7 @@ THE SOFTWARE.
       this.transform = mat4.create();
       this.transformDirty = true;
       this.normalMatrix = mat3.create();
+      this.worldViewProjectionMatrix = mat4.create();
       this.children = [];
       this.visible = true;
     }
@@ -196,8 +197,15 @@ THE SOFTWARE.
       return this.transform;
     };
 
+    Object3D.prototype.getNormalMatrix = function(camera, worldMatrix) {
+      var temp;
+      temp = mat4.create();
+      mat4.multiply(temp, camera.getViewMatrix(), worldMatrix);
+      mat3.normalFromMat4(this.normalMatrix, temp);
+      return this.normalMatrix;
+    };
+
     Object3D.prototype.draw = function(camera, worldMatrix) {
-      var temp, worldViewProjectionMatrix;
       if (!this.material || !this.loaded) {
         return;
       }
@@ -206,13 +214,9 @@ THE SOFTWARE.
       if (worldMatrix == null) {
         worldMatrix = this.transform;
       }
-      temp = mat4.create();
-      mat4.multiply(temp, camera.getViewMatrix(), worldMatrix);
-      worldViewProjectionMatrix = mat4.clone(camera.getProjectionMatrix());
-      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix());
-      mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix);
-      mat3.normalFromMat4(this.normalMatrix, temp);
-      this.setMatrixUniforms(worldViewProjectionMatrix, this.normalMatrix);
+      this.getNormalMatrix(camera, worldMatrix);
+      mat4.multiply(this.worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix);
+      this.setMatrixUniforms(this.worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
       return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
@@ -1280,6 +1284,7 @@ THE SOFTWARE.
       this.fov = 45.0;
       this.up = vec3.fromValues(0.0, 1.0, 0.0);
       this.viewMatrix = mat4.create();
+      this.viewProjectionMatrix = mat4.create();
       this.near = 0.01;
       this.far = 60.0;
       this.projectionMatrix = mat4.create();
@@ -1304,10 +1309,7 @@ THE SOFTWARE.
     };
 
     Camera.prototype.getViewProjectionMatrix = function() {
-      var temp;
-      temp = mat4.create();
-      mat4.multiply(temp, this.projectionMatrix, this.viewMatrix);
-      return temp;
+      return this.viewProjectionMatrix;
     };
 
     Camera.prototype.getFrustumCorners = function() {
@@ -1341,8 +1343,7 @@ THE SOFTWARE.
     Camera.prototype.getInverseViewProjectionMatrix = function() {
       var vpMatrix;
       vpMatrix = mat4.create();
-      mat4.multiply(vpMatrix, this.projectionMatrix, this.viewMatrix);
-      mat4.invert(vpMatrix, vpMatrix);
+      mat4.invert(vpMatrix, this.viewProjectionMatrix);
       return vpMatrix;
     };
 
@@ -1355,7 +1356,8 @@ THE SOFTWARE.
       var aspect;
       mat4.identity(this.projectionMatrix);
       aspect = this.viewportWidth / this.viewportHeight;
-      return mat4.perspective(this.projectionMatrix, this.fov, aspect, this.near, this.far);
+      mat4.perspective(this.projectionMatrix, this.fov, aspect, this.near, this.far);
+      return mat4.multiply(this.viewProjectionMatrix, this.projectionMatrix, this.viewMatrix);
     };
 
     return Camera;

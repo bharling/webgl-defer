@@ -67,6 +67,7 @@ class DFIR.Camera extends DFIR.Object3D
     @fov = 45.0
     @up = vec3.fromValues 0.0, 1.0, 0.0
     @viewMatrix = mat4.create()
+    @viewProjectionMatrix = mat4.create()
     @near = 0.01
     @far = 60.0
     @projectionMatrix = mat4.create()
@@ -86,9 +87,7 @@ class DFIR.Camera extends DFIR.Object3D
     @projectionMatrix
 
   getViewProjectionMatrix: ->
-    temp = mat4.create()
-    mat4.multiply temp, @projectionMatrix, @viewMatrix
-    temp
+    @viewProjectionMatrix
 
   getFrustumCorners: ->
     v = vec3.create()
@@ -139,8 +138,7 @@ class DFIR.Camera extends DFIR.Object3D
 
   getInverseViewProjectionMatrix: ->
     vpMatrix = mat4.create()
-    mat4.multiply vpMatrix, @projectionMatrix, @viewMatrix
-    mat4.invert vpMatrix, vpMatrix
+    mat4.invert vpMatrix, @viewProjectionMatrix
     vpMatrix
 
   updateViewMatrix: ->
@@ -151,6 +149,7 @@ class DFIR.Camera extends DFIR.Object3D
     mat4.identity @projectionMatrix
     aspect = @viewportWidth / @viewportHeight
     mat4.perspective @projectionMatrix, @fov, aspect, @near, @far
+    mat4.multiply @viewProjectionMatrix, @projectionMatrix, @viewMatrix
 
 
 class Pointer

@@ -178,6 +178,7 @@ class DFIR.Object3D
     @transform = mat4.create()
     @transformDirty = true
     @normalMatrix = mat3.create()
+    @worldViewProjectionMatrix = mat4.create()
     @children = []
     @visible = true
 
@@ -186,22 +187,28 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
+  getNormalMatrix: (camera, worldMatrix) ->
+  	temp = mat4.create()
+  	mat4.multiply temp, camera.getViewMatrix(), worldMatrix
+  	mat3.normalFromMat4 @normalMatrix, temp
+  	@normalMatrix
+
   draw: (camera, worldMatrix) ->
     if !@material or !@loaded
       return
     @material.use()
     @update()
     worldMatrix ?= @transform
-    temp = mat4.create()
+    @getNormalMatrix(camera, worldMatrix)
 
-    mat4.multiply temp, camera.getViewMatrix() , worldMatrix
+    mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
 
     
-    worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
-    mat3.normalFromMat4 @normalMatrix, temp
-    @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
+    #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
+    
+    @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
     gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
@@ -1048,6 +1055,7 @@ class DFIR.Camera extends DFIR.Object3D
     @fov = 45.0
     @up = vec3.fromValues 0.0, 1.0, 0.0
     @viewMatrix = mat4.create()
+    @viewProjectionMatrix = mat4.create()
     @near = 0.01
     @far = 60.0
     @projectionMatrix = mat4.create()
@@ -1067,9 +1075,7 @@ class DFIR.Camera extends DFIR.Object3D
     @projectionMatrix
 
   getViewProjectionMatrix: ->
-    temp = mat4.create()
-    mat4.multiply temp, @projectionMatrix, @viewMatrix
-    temp
+    @viewProjectionMatrix
 
   getFrustumCorners: ->
     v = vec3.create()
@@ -1120,8 +1126,7 @@ class DFIR.Camera extends DFIR.Object3D
 
   getInverseViewProjectionMatrix: ->
     vpMatrix = mat4.create()
-    mat4.multiply vpMatrix, @projectionMatrix, @viewMatrix
-    mat4.invert vpMatrix, vpMatrix
+    mat4.invert vpMatrix, @viewProjectionMatrix
     vpMatrix
 
   updateViewMatrix: ->
@@ -1132,6 +1137,7 @@ class DFIR.Camera extends DFIR.Object3D
     mat4.identity @projectionMatrix
     aspect = @viewportWidth / @viewportHeight
     mat4.perspective @projectionMatrix, @fov, aspect, @near, @far
+    mat4.multiply @viewProjectionMatrix, @projectionMatrix, @viewMatrix
 
 
 class Pointer

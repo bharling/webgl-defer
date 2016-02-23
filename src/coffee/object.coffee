@@ -11,6 +11,7 @@ class DFIR.Object3D
     @transform = mat4.create()
     @transformDirty = true
     @normalMatrix = mat3.create()
+    @worldViewProjectionMatrix = mat4.create()
     @children = []
     @visible = true
 
@@ -19,22 +20,28 @@ class DFIR.Object3D
       @updateWorldTransform()
     @transform
 
+  getNormalMatrix: (camera, worldMatrix) ->
+  	temp = mat4.create()
+  	mat4.multiply temp, camera.getViewMatrix(), worldMatrix
+  	mat3.normalFromMat4 @normalMatrix, temp
+  	@normalMatrix
+
   draw: (camera, worldMatrix) ->
     if !@material or !@loaded
       return
     @material.use()
     @update()
     worldMatrix ?= @transform
-    temp = mat4.create()
+    @getNormalMatrix(camera, worldMatrix)
 
-    mat4.multiply temp, camera.getViewMatrix() , worldMatrix
+    mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
 
     
-    worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
-    mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
-    mat3.normalFromMat4 @normalMatrix, temp
-    @setMatrixUniforms(worldViewProjectionMatrix, @normalMatrix)
+    #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
+    
+    @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
     gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
