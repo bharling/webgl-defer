@@ -441,7 +441,6 @@ THE SOFTWARE.
   loadJSON = function(url, callback) {
     var key, request;
     key = md5(url);
-    console.log(key);
     if (DFIR.Geometry.meshCache[key] != null) {
       console.log('Not loading #{url}');
       callback(DFIR.Geometry.meshCache[key]);
@@ -1099,7 +1098,6 @@ THE SOFTWARE.
   loadJSON = function(url, callback) {
     var key, request;
     key = md5(url);
-    console.log(key);
     if (DFIR.Geometry.meshCache[key] != null) {
       console.log('Not loading #{url}');
       callback(DFIR.Geometry.meshCache[key]);
@@ -1635,6 +1633,21 @@ THE SOFTWARE.
 
   })(DFIR.Camera);
 
+  DFIR.Light = (function() {
+    function Light(position1, color, strength, attenuation) {
+      this.position = position1;
+      this.color = color;
+      this.strength = strength != null ? strength : 1.0;
+      this.attenuation = attenuation != null ? attenuation : 1.0;
+      if (this.color == null) {
+        this.color = vec3.fromValues(1.0, 1.0, 1.0);
+      }
+    }
+
+    return Light;
+
+  })();
+
   DFIR.DirectionalLight = (function(superClass) {
     extend(DirectionalLight, superClass);
 
@@ -1642,14 +1655,9 @@ THE SOFTWARE.
       return DirectionalLight.__super__.constructor.apply(this, arguments);
     }
 
-    DirectionalLight.prototype.bind = function(uniforms) {
-      gl.uniform3fv(uniforms.lightColor, this.color);
-      return gl.uniform3fv(uniforms.lightDirection, this.direction);
-    };
-
     return DirectionalLight;
 
-  })(DFIR.Object3D);
+  })(DFIR.Light);
 
   DFIR.ShadowCamera = (function(superClass) {
     extend(ShadowCamera, superClass);
@@ -1703,7 +1711,9 @@ THE SOFTWARE.
 
     Gbuffer.prototype.createTexture = function(format) {
       var tex;
-      format = this.half_ext.HALF_FLOAT_OES;
+      if (format == null) {
+        format = this.half_ext.HALF_FLOAT_OES;
+      }
       tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -2028,6 +2038,9 @@ THE SOFTWARE.
   DFIR.Scene = (function() {
     function Scene() {
       this.root = new DFIR.SceneNode();
+      this.directionalLights = [];
+      this.pointLights = [];
+      this.spotLights = [];
     }
 
     return Scene;
@@ -2040,10 +2053,6 @@ THE SOFTWARE.
       this.debug_view = 0;
       this.width = canvas ? canvas.width : window.innerWidth;
       this.height = canvas ? canvas.height : window.innerHeight;
-      this.sunDirection = vec3.fromValues(-1.0, 1.0, 0.0);
-      this.sunColor = vec3.fromValues(1.0, 1.0, 1.0);
-      this.metallic = 1.0;
-      this.roughness = 0.5;
       this.exposure = 1.0;
       if (canvas == null) {
         canvas = document.createElement('canvas');
@@ -2061,13 +2070,34 @@ THE SOFTWARE.
       this.drawCallCount = 0;
     }
 
+    Renderer.prototype.checkReadiness = function() {
+      if ((this.quad != null) && (this.outputQuad != null)) {
+        return this.ready = true;
+      }
+    };
+
     Renderer.prototype.createTargets = function() {
-      return DFIR.ShaderLoader.load('shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (function(_this) {
+      var status;
+      this.accumulationTexture = this.gbuffer.createTexture();
+      this.frameBuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.accumulationTexture, 0);
+      status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      console.log("Final FrameBuffer status after initialization: " + status);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      DFIR.ShaderLoader.load('shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (function(_this) {
         return function(program) {
           _this.quad = new DFIR.FullscreenQuad();
           _this.quad.setMaterial(new DFIR.Shader(program));
           _this.quad.material.showInfo();
-          return _this.ready = true;
+          return _this.checkReadiness();
+        };
+      })(this));
+      return DFIR.ShaderLoader.load('shaders/fs_quad_vert.glsl', 'shaders/post_process_frag.glsl', (function(_this) {
+        return function(program) {
+          _this.outputQuad = new DFIR.FullscreenQuad();
+          _this.outputQuad.setMaterial(new DFIR.Shader(program));
+          return _this.checkReadiness();
         };
       })(this));
     };
@@ -2086,6 +2116,7 @@ THE SOFTWARE.
     Renderer.prototype.enableGBuffer = function() {
       this.gbuffer.bind();
       gl.cullFace(gl.BACK);
+      gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ZERO);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       return gl.enable(gl.CULL_FACE);
@@ -2112,8 +2143,11 @@ THE SOFTWARE.
     };
 
     Renderer.prototype.doLighting = function(scene, camera) {
+      var l, len, light, ref;
       this.quad.material.use();
       this.quad.bind();
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
       gl.activeTexture(gl.TEXTURE1);
@@ -2125,14 +2159,36 @@ THE SOFTWARE.
       gl.uniform1i(this.quad.material.getUniform('albedoTexture'), 2);
       gl.uniformMatrix4fv(this.quad.material.getUniform('uViewMatrix'), false, camera.getViewMatrix());
       gl.uniformMatrix4fv(this.quad.material.getUniform('uViewProjectionMatrix'), false, camera.getViewProjectionMatrix());
-      gl.uniform3fv(this.quad.material.getUniform('lightDirection'), this.sunDirection);
-      gl.uniform3fv(this.quad.material.getUniform('lightColor'), this.sunColor);
-      gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseProjectionMatrix'), false, camera.getInverseProjectionMatrix());
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseViewProjectionMatrix'), false, camera.getInverseViewProjectionMatrix());
       gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
-      gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
+      gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
+      ref = scene.directionalLights;
+      for (l = 0, len = ref.length; l < len; l++) {
+        light = ref[l];
+        gl.uniform3fv(this.quad.material.getUniform('lightDirection'), light.position);
+        gl.uniform3fv(this.quad.material.getUniform('lightColor'), light.color);
+        gl.uniform1f(this.quad.material.getUniform('lightStrength'), light.strength);
+        gl.uniform1f(this.quad.material.getUniform('lightAttenuation'), light.attenuation);
+        gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
+      }
       return this.quad.release();
+    };
+
+    Renderer.prototype.doPostProcess = function(scene, camera) {
+      gl.disable(gl.BLEND);
+      this.outputQuad.material.use();
+      this.outputQuad.bind();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.accumulationTexture);
+      gl.uniform1i(this.outputQuad.material.getUniform('depthTexture'), 0);
+      gl.uniform1i(this.outputQuad.material.getUniform('renderTexture'), 1);
+      gl.uniform1i(this.outputQuad.material.getUniform('DEBUG'), this.debug_view);
+      gl.uniform1f(this.outputQuad.material.getUniform('exposure'), this.exposure);
+      gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
+      return this.outputQuad.release();
     };
 
     Renderer.prototype.draw = function(scene, camera) {

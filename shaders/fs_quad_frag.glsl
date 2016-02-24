@@ -14,32 +14,17 @@ uniform mat4 uViewProjectionMatrix;
 // Directional Light
 uniform vec3 lightDirection;
 uniform vec3 lightColor;
+uniform float lightStrength;
+uniform float lightAttenuation;
+
+
 uniform float exposure;
 
 varying vec2 vTexCoords;
-
 uniform vec2 resolution;
-
-//uniform int DEBUG;
-
 varying float debug;
 
 #define PI 3.1415926535897932384626433832795
-
-// vec3 reconstructViewSpacePosition( float p_depth, vec2 p_ndc ) {
-
-// 	// these coords are uvs eg bottom left is 0,0
-// 	p_ndc = p_ndc * 2.0 - 1.0;
-// 	float x = p_ndc.x;
-//   float y = (p_ndc.y);
-//   vec4 vProjectedPos = vec4(x, y, p_depth * 2.0 - 1.0, 1.0);
-//   // Transform by the inverse projection matrix
-//   vec4 vPositionVS = vProjectedPos * inverseProjectionMatrix;
-//   // Divide by w to get the view-space position
-//   return vPositionVS.xyz / vPositionVS.w;
-
-
-// }
 
 vec3 reconstructViewSpacePosition( float depth, vec2 texcoord ) {
   vec4 clipSpaceLocation;
@@ -78,34 +63,12 @@ float decodeDepth( vec4 rgba ) {
   return rgba.r;
 }
 
-
-// Specular
-// vec3 D(vec3 h) // Normal Distribution Function - GGX/Trowbridge-Reitz
-// {
-//     float alpha = roughness * roughness;
-//     float NxH = dot(fNormal,h);
-//     float alpha2 = alpha*alpha;
-//     float t = ((NxH * NxH) * (alpha2 - 1.0) + 1.0);
-
-
-
-// }
-
 vec3 Gsub(vec3 v, vec3 fNormal, float roughness) // Sub Function of G
 {
     //v = -v;
     float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
     return vec3(dot(fNormal, v) / ((dot(fNormal, v)) * (1.0 - k) + k));
 }
-// vec3 G(vec3 l, vec3 v, vec3 h) // Geometric Attenuation Term - Schlick Modified (k = a/2)
-// {
-//     return Gsub(l) * Gsub(v);
-// }
-// vec3 F(vec3 v, vec3 h, vec3 specularColor) // Fresnel - Schlick Modified (Spherical Gaussian Approximation)
-// {
-//     vec3 f0 = specularColor; // right?
-//     return f0 + (1.0 - f0) * pow(2, (-5.55473 * (dot(v, h)) - 6.98316) * (dot(v, h)));
-// }
 
 float fresnel(vec3 direction, vec3 normal, bool invert) {
     vec3 nDirection = normalize( direction );
@@ -118,28 +81,6 @@ float fresnel(vec3 direction, vec3 normal, bool invert) {
 
     return factor;
 }
-
-// vec3 specular(float dotNL, float dotNH, float dotNV, float dotVH, float roughness, vec3 realSpecularColor, vec3 viewDir, vec3 sunDir, vec3 normal)
-// {
-//     // ggx distribution
-//     // http://stackoverflow.com/questions/23726495/physically-based-shader-not-producing-desired-results
-//     float alpha = roughness * roughness;
-//     float alpha2 = alpha*alpha;
-//     float t = ((dotNH * dotNH) * (alpha2 - 1.0) + 1.0);
-//     vec3 D = vec3(alpha2 / (PI * t * t));
-
-//     // fresnel - quick and dirty
-//     // http://www.standardabweichung.de/code/javascript/webgl-glsl-fresnel-schlick-approximation
-//     float product = max(dotNH, 0.0);
-//     float F = pow( product, 5.0 );
-
-//     vec3 G = Gsub( sunDir, normal, roughness ) * Gsub( viewDir, normal, roughness );
-
-//     return D * F * G / 4.0 * dotNL * dotNV;
-
-
-//     //return (D(halfVector) * F(eyeVector, halfVector) * G(lightVector, eyeVector, halfVector)) / 4 * ((dot(fNormal, lightVector)) * (dot(fNormal, eyeVector)));
-// }
 
 vec3 albedo( vec3 realAlbedo ) {
   return realAlbedo / PI;
@@ -254,14 +195,6 @@ void main (void) {
   	return;
   }
 
-
-  // vec4 decodedNormal = vec4(normalsSample.xyz * 2.0 - 1.0, 1.0 ); //vec4(decodeNormal(  normalsSample ), 1.0);
-
-  
-
-
-
-
   vec3 viewPosition = reconstructViewSpacePosition( depthSample.r, vTexCoords );
 
   if (DEBUG == 6.0) {
@@ -269,71 +202,11 @@ void main (void) {
   	return;
   }
 
-  vec3 sunColor = lightColor.xyz;
-  float strength = 1.5;
   vec3 sunDir = normalize(uViewMatrix * vec4(lightDirection, 0.0)).xyz; //normalize(uViewRotationMatrix * vec4(-lightPosition.xyz, 1.0)).xyz;
-  float attenuation = 1.0;
-
-  //vec3 normal, vec3 diffuse, float sunColor, float strength, vec3 sunDir, vec3 viewDir, float attenuation, float roughness, float metallic
-
-  //vec3 ld = normalize(sunDir);
   vec3 viewDirection = -normalize(viewPosition);
 
-  vec4 color = computeLighting(decodedNormal.xyz, matColor, sunColor, strength, sunDir, viewDirection, attenuation, roughness, metallic);
+  vec4 color = computeLighting(decodedNormal.xyz, matColor, lightColor, lightStrength, sunDir, viewDirection, lightAttenuation, roughness, metallic);
 
-  //color += vec4(0.0001, 0.0001, 0.0002, 0.0);
+  gl_FragColor =  color;
 
-  gl_FragColor = reinhardt( color );
-
-
-  // vec3 worldPosition = viewPosition;
-
-  // vec3 eyeDirection = normalize(viewPosition);
-
-  // vec4 _sundir = normalize(vec4(lightPosition.xyz, 1.0));
-
-  // vec3 sunDir = _sundir.xyz;
-
-  // vec3 H = normalize(eyeDirection+-sunDir);
-  // vec3 N = decodedNormal.xyz;
-
-  // vec3 reflectionDirection = reflect(decodedNormal.xyz, sunDir );
-
-  // float specVal = pow(max(dot(reflectionDirection, eyeDirection), 0.0), specularExponent);
-
-  // //float specVal = pow( clamp( dot(N, H), 0.0, 1.0 ), 5.0 );
-
-  // float base = 1.0 - dot(eyeDirection, H);
-  // float exponential = pow(base, 5.0);
-  // float fresnel = exponential + 1.2 * (1.0 - exponential);
-  // specVal *= fresnel;
-
-  // float sun = clamp( dot( decodedNormal.xyz, sunDir), 0.0, 1.0);
-
-  // float ind = clamp( dot( decodedNormal.xyz, normalize(sunDir*vec3(-1.0,0.0,-1.0)) ), 0.0, 1.0 );
-
-  // float sky = clamp( 0.5 + 0.5*decodedNormal.y, 0.0, 1.0 );
-
-  // vec3 lin = sun * vec3(1.64, 1.27, 0.99);
-
-
-
-  // //lin += sky*vec3(0.16,0.20,0.28);
-
-  // //lin += ind*vec3(0.40,0.28,0.20) * 0.2;
-
-  // //lin += specularColor * specVal;
-
-  // vec3 color = matColor * lin;
-
-  // //color = mix(color, specularColor, specVal);
-
-  // color = pow( color, vec3(1.0/2.2) );
-
-
-
-  // gl_FragColor = vec4(color, 1.0);
-
-  // //gl_FragColor = decodedNormal;
-  // //gl_FragColor = mix(d, decodedNormal, vTexCoords.x > 0.5 ? 1.0 : 0.0);
 }

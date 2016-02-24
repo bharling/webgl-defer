@@ -1,6 +1,5 @@
 loadJSON = (url, callback) ->
   key = md5(url)
-  console.log key
   if DFIR.Geometry.meshCache[key]?
     console.log 'Not loading #{url}'
     callback DFIR.Geometry.meshCache[key]
@@ -77,6 +76,3 @@ class DFIR.ModelResource extends DFIR.Resource
 
   release: ->
     	gl.bindBuffer gl.ARRAY_BUFFER, null
-
-
-

@@ -67,8 +67,8 @@ class DFIR.SceneNode
 			for child in @children
 				child.walk(callback)
 
-			
-			
+
+
 
 
 	addChild: (child) ->
@@ -88,7 +88,7 @@ class DFIR.SceneNode
 		if parentMatrix
 			mat4.multiply @worldMatrix, parentMatrix, @localMatrix
 		else
-			mat4.copy @worldMatrix, @localMatrix 
+			mat4.copy @worldMatrix, @localMatrix
 
 		for child in @children
 			child.updateWorldMatrix @worldMatrix
@@ -101,6 +101,6 @@ class DFIR.SceneNode
 class DFIR.Scene
 	constructor:() ->
 		@root = new DFIR.SceneNode()
-
-
-	
+		@directionalLights = []
+		@pointLights = []
+		@spotLights = []

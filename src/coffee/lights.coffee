@@ -1,6 +1,6 @@
-class DFIR.DirectionalLight extends DFIR.Object3D
+class DFIR.Light
+	constructor: (@position, @color, @strength=1.0, @attenuation=1.0) ->
+		@color ?= vec3.fromValues 1.0, 1.0, 1.0
 
-	bind : (uniforms) ->
-		gl.uniform3fv(uniforms.lightColor, @color)
-		gl.uniform3fv(uniforms.lightDirection, @direction)
 
+class DFIR.DirectionalLight extends DFIR.Light

@@ -1,6 +1,5 @@
 loadJSON = (url, callback) ->
   key = md5(url)
-  console.log key
   if DFIR.Geometry.meshCache[key]?
     console.log 'Not loading #{url}'
     callback DFIR.Geometry.meshCache[key]
@@ -89,7 +88,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
       @loaded = true
     else if data.faces?
       @parseThreeJSModel data
-      
+
       #@vertexIndexBuffer = new DFIR.Buffer( new Float32Array( data.faces ), 1, gl.STATIC_DRAW, gl.ELEMENT_ARRAY_BUFFER )
       #@loaded = true
 
@@ -148,7 +147,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
               u = uvLayer[ uvIndex * 2 ]
               v = uvLayer[ uvIndex * 2 + 1 ]
 
-              if j isnt 2 
+              if j isnt 2
                 vertexUvs.push u
                 vertexUvs.push v
               if j isnt 0
@@ -161,7 +160,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
         if hasFaceVertexNormal
           for i in [0 ... 4] by 1
               normalIndex = faces[ offset++ ] * 3
-              normal = [ normalIndex++, normalIndex++, normalIndex ] 
+              normal = [ normalIndex++, normalIndex++, normalIndex ]
               if i isnt 2
                 vertexNormals.push normals[normal[0]]
                 vertexNormals.push normals[normal[1]]
@@ -190,7 +189,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
               uvIndex = faces[offset++]
               u = uvLayer[ uvIndex * 2 ]
               v = uvLayer[ uvIndex * 2 + 1 ]
-              if j isnt 2 
+              if j isnt 2
                 vertexUvs.push u
                 vertexUvs.push v
               if j isnt 0
@@ -211,7 +210,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
             #vertexNormals.push 0.0
             #vertexNormals.push 1.0
             #vertexNormals.push 0.0
-            
+
 
         if hasFaceColor
           offset++
@@ -224,7 +223,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
     @loaded=true
 
 
-      
+
   normalizeNormals: (normals) ->
     for i in [0 ... normals.length] by 3
 
@@ -242,5 +241,3 @@ class DFIR.JSONGeometry extends DFIR.Object3D
 
   @load: (url) ->
     new DFIR.JSONGeometry url
-
-
