@@ -31,12 +31,7 @@ class DFIR.Gbuffer
     console.log "GBuffer FrameBuffer status after initialization: #{status}";
 
 
-    # set draw targets
-    @mrt_ext.drawBuffersWEBGL [
-        @mrt_ext.COLOR_ATTACHMENT0_WEBGL,
-        @mrt_ext.COLOR_ATTACHMENT1_WEBGL,
-        #@mrt_ext.COLOR_ATTACHMENT2_WEBGL
-      ]
+
 
     @release()
 
@@ -72,12 +67,17 @@ class DFIR.Gbuffer
 
   bind: ->
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
-    #gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
+    @mrt_ext.drawBuffersWEBGL [
+        @mrt_ext.COLOR_ATTACHMENT0_WEBGL,
+        @mrt_ext.COLOR_ATTACHMENT1_WEBGL,
+    ]
 
 
   release : ->
     #gl.bindTexture gl.TEXTURE_2D, null
+    @mrt_ext.drawBuffersWEBGL [gl.NONE]
     gl.bindFramebuffer gl.FRAMEBUFFER, null
+
 
 
   getDepthTextureUnit: ->

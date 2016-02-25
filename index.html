@@ -57,13 +57,13 @@
 		scene = new DFIR.Scene();
 
 
-		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(-1.0, 1.0, 0.0), vec3.fromValues(1.0, 1.0, 1.0)));
+		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(-0.5, 1.0, 0.0), vec3.fromValues(1.0, 1.0, 1.0), 3.0));
 		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(0.5, 0.6, -0.3), vec3.fromValues(0.76, 0.6, 1.0)));
-		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(0.2, 0.8, 0.7), vec3.fromValues(0.80, 0.80, 0.0)));
+		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(0.2, 0.8, 0.7), vec3.fromValues(0.9, 0.30, 0.0)));
 
 		console.log ( scene.directionalLights );
 
-		renderer = new DFIR.Renderer(canvas);
+		renderer = new DFIR.Renderer(canvas, false);
 
 		gui.add(renderer, 'debug_view',
 		{ 	'Full Render':0,

@@ -88,7 +88,7 @@
   void main (void) {
     vec3 N = normalize(uNormalMatrix * vNormal);
 
-    N = perturb_normal(N, vEyeDirection, vTexCoords );
+    //N = perturb_normal(N, vEyeDirection, vTexCoords );
 
     //float metallic = 0.6;
     //float roughness = 0.6;

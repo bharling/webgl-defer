@@ -1,5 +1,5 @@
 class DFIR.Renderer
-	constructor: (canvas) ->
+	constructor: (canvas, @post_process_enabled=false) ->
 		@ready = false
 		@debug_view = 0
 		@width = if canvas then canvas.width else window.innerWidth
@@ -28,10 +28,12 @@ class DFIR.Renderer
 		@accumulationTexture = @gbuffer.createTexture()
 		@frameBuffer = gl.createFramebuffer()
 		gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+		gl.bindTexture gl.TEXTURE_2D, @accumulationTexture
 		gl.framebufferTexture2D gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, @accumulationTexture, 0
 		status = gl.checkFramebufferStatus gl.FRAMEBUFFER
 		console.log "Final FrameBuffer status after initialization: #{status}";
 		gl.bindFramebuffer gl.FRAMEBUFFER, null
+		gl.bindTexture gl.TEXTURE_2D, null
 
 
 		DFIR.ShaderLoader.load 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (program) =>
@@ -48,7 +50,7 @@ class DFIR.Renderer
 
 
 	setDefaults: () ->
-		gl.clearColor 0.0, 0.0, 0.0, 0.0
+		gl.clearColor 0.0, 0.0, 0.0, 1.0
 		gl.enable gl.DEPTH_TEST
 		gl.depthFunc gl.LEQUAL
 		gl.depthMask true
@@ -96,7 +98,8 @@ class DFIR.Renderer
 		@quad.material.use()
 		@quad.bind()
 
-		#gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
 
 		gl.enable gl.BLEND
 		gl.blendFunc gl.ONE, gl.ONE
@@ -130,22 +133,23 @@ class DFIR.Renderer
 			gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
 		@quad.release()
-		#gl.bindFramebuffer gl.FRAMEBUFFER, null
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, null
 
 	doPostProcess: (scene, camera) ->
-		gl.disable gl.BLEND
+		@setDefaults()
 
 		@outputQuad.material.use()
 		@outputQuad.bind()
 
-		gl.activeTexture(gl.TEXTURE0)
-		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
+		#gl.activeTexture(gl.TEXTURE0)
+		#gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
 
-		gl.activeTexture(gl.TEXTURE1)
+		gl.activeTexture(gl.TEXTURE0)
 		gl.bindTexture(gl.TEXTURE_2D, @accumulationTexture)
 
-		gl.uniform1i(@outputQuad.material.getUniform('depthTexture'), 0)
-		gl.uniform1i(@outputQuad.material.getUniform('renderTexture'), 1)
+		#gl.uniform1i(@outputQuad.material.getUniform('depthTexture'), 0)
+		gl.uniform1i(@outputQuad.material.getUniform('renderTexture'), 0)
 
 		gl.uniform1i(@outputQuad.material.getUniform('DEBUG'), @debug_view)
 		gl.uniform1f(@outputQuad.material.getUniform('exposure'), @exposure)
@@ -159,4 +163,5 @@ class DFIR.Renderer
 		if @ready
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
-			#@doPostProcess(scene, camera)
+			if @post_process_enabled
+				@doPostProcess(scene, camera)

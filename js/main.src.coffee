@@ -181,6 +181,8 @@ class DFIR.Object3D
     @worldViewProjectionMatrix = mat4.create()
     @children = []
     @visible = true
+    @metallic = Math.random()
+    @roughness = Math.random()
 
   getWorldTransform: () ->
     if @transformDirty is true
@@ -203,23 +205,27 @@ class DFIR.Object3D
 
     mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
 
-    
+
     #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
-    
+
     @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
+
+    gl.uniform1f @material.getUniform('roughness'), @roughness
+    gl.uniform1f @material.getUniform('metallic'), @metallic
+
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
     gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
 
 
   bindTextures: () ->
     gl.activeTexture gl.TEXTURE0
-    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
-    gl.uniform1i @material.getUniform('diffuseTex'), 0 
-    gl.activeTexture gl.TEXTURE1 
-    gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
+    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap
+    gl.uniform1i @material.getUniform('diffuseTex'), 0
+    gl.activeTexture gl.TEXTURE1
+    gl.bindTexture gl.TEXTURE_2D, @material.normalMap
     gl.uniform1i @material.getUniform('normalTex'), 1
 
   setMatrixUniforms: (wvpMatrix, normalMatrix) ->
@@ -892,7 +898,7 @@ class DFIR.PBRShader extends DFIR.Shader
     super( @program )
     @metallic = 0.0
     @roughness = 0.0
-    @diffuseColor = new DFIR.Color()
+    @diffuseColor = new DFIR.Color(0.2, 1.0, 1.0)
 
   use: ->
     gl.useProgram @program
@@ -1404,12 +1410,7 @@ class DFIR.Gbuffer
     console.log "GBuffer FrameBuffer status after initialization: #{status}";
 
 
-    # set draw targets
-    @mrt_ext.drawBuffersWEBGL [
-        @mrt_ext.COLOR_ATTACHMENT0_WEBGL,
-        @mrt_ext.COLOR_ATTACHMENT1_WEBGL,
-        #@mrt_ext.COLOR_ATTACHMENT2_WEBGL
-      ]
+
 
     @release()
 
@@ -1445,12 +1446,17 @@ class DFIR.Gbuffer
 
   bind: ->
     gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
-    #gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
+    @mrt_ext.drawBuffersWEBGL [
+        @mrt_ext.COLOR_ATTACHMENT0_WEBGL,
+        @mrt_ext.COLOR_ATTACHMENT1_WEBGL,
+    ]
 
 
   release : ->
     #gl.bindTexture gl.TEXTURE_2D, null
+    @mrt_ext.drawBuffersWEBGL [gl.NONE]
     gl.bindFramebuffer gl.FRAMEBUFFER, null
+
 
 
   getDepthTextureUnit: ->
@@ -1787,7 +1793,7 @@ class DFIR.Scene
 		@spotLights = []
 
 class DFIR.Renderer
-	constructor: (canvas) ->
+	constructor: (canvas, @post_process_enabled=false) ->
 		@ready = false
 		@debug_view = 0
 		@width = if canvas then canvas.width else window.innerWidth
@@ -1816,10 +1822,12 @@ class DFIR.Renderer
 		@accumulationTexture = @gbuffer.createTexture()
 		@frameBuffer = gl.createFramebuffer()
 		gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+		gl.bindTexture gl.TEXTURE_2D, @accumulationTexture
 		gl.framebufferTexture2D gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, @accumulationTexture, 0
 		status = gl.checkFramebufferStatus gl.FRAMEBUFFER
 		console.log "Final FrameBuffer status after initialization: #{status}";
 		gl.bindFramebuffer gl.FRAMEBUFFER, null
+		gl.bindTexture gl.TEXTURE_2D, null
 
 
 		DFIR.ShaderLoader.load 'shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (program) =>
@@ -1836,7 +1844,7 @@ class DFIR.Renderer
 
 
 	setDefaults: () ->
-		gl.clearColor 0.0, 0.0, 0.0, 0.0
+		gl.clearColor 0.0, 0.0, 0.0, 1.0
 		gl.enable gl.DEPTH_TEST
 		gl.depthFunc gl.LEQUAL
 		gl.depthMask true
@@ -1884,7 +1892,8 @@ class DFIR.Renderer
 		@quad.material.use()
 		@quad.bind()
 
-		#gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
 
 		gl.enable gl.BLEND
 		gl.blendFunc gl.ONE, gl.ONE
@@ -1918,22 +1927,23 @@ class DFIR.Renderer
 			gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
 		@quad.release()
-		#gl.bindFramebuffer gl.FRAMEBUFFER, null
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, null
 
 	doPostProcess: (scene, camera) ->
-		gl.disable gl.BLEND
+		@setDefaults()
 
 		@outputQuad.material.use()
 		@outputQuad.bind()
 
-		gl.activeTexture(gl.TEXTURE0)
-		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
+		#gl.activeTexture(gl.TEXTURE0)
+		#gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
 
-		gl.activeTexture(gl.TEXTURE1)
+		gl.activeTexture(gl.TEXTURE0)
 		gl.bindTexture(gl.TEXTURE_2D, @accumulationTexture)
 
-		gl.uniform1i(@outputQuad.material.getUniform('depthTexture'), 0)
-		gl.uniform1i(@outputQuad.material.getUniform('renderTexture'), 1)
+		#gl.uniform1i(@outputQuad.material.getUniform('depthTexture'), 0)
+		gl.uniform1i(@outputQuad.material.getUniform('renderTexture'), 0)
 
 		gl.uniform1i(@outputQuad.material.getUniform('DEBUG'), @debug_view)
 		gl.uniform1f(@outputQuad.material.getUniform('exposure'), @exposure)
@@ -1947,4 +1957,5 @@ class DFIR.Renderer
 		if @ready
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
-			#@doPostProcess(scene, camera)
+			if @post_process_enabled
+				@doPostProcess(scene, camera)

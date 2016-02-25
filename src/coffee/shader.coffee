@@ -276,7 +276,7 @@ class DFIR.PBRShader extends DFIR.Shader
     super( @program )
     @metallic = 0.0
     @roughness = 0.0
-    @diffuseColor = new DFIR.Color()
+    @diffuseColor = new DFIR.Color(0.2, 1.0, 1.0)
 
   use: ->
     gl.useProgram @program

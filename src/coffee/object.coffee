@@ -14,6 +14,8 @@ class DFIR.Object3D
     @worldViewProjectionMatrix = mat4.create()
     @children = []
     @visible = true
+    @metallic = Math.random()
+    @roughness = Math.random()
 
   getWorldTransform: () ->
     if @transformDirty is true
@@ -36,23 +38,27 @@ class DFIR.Object3D
 
     mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
 
-    
+
     #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
     #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
     #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
-    
+
     @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
     @bindTextures()
+
+    gl.uniform1f @material.getUniform('roughness'), @roughness
+    gl.uniform1f @material.getUniform('metallic'), @metallic
+
     gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @vertexIndexBuffer.get()
     gl.drawElements gl.TRIANGLES, @vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0
 
 
   bindTextures: () ->
     gl.activeTexture gl.TEXTURE0
-    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap 
-    gl.uniform1i @material.getUniform('diffuseTex'), 0 
-    gl.activeTexture gl.TEXTURE1 
-    gl.bindTexture gl.TEXTURE_2D, @material.normalMap 
+    gl.bindTexture gl.TEXTURE_2D, @material.diffuseMap
+    gl.uniform1i @material.getUniform('diffuseTex'), 0
+    gl.activeTexture gl.TEXTURE1
+    gl.bindTexture gl.TEXTURE_2D, @material.normalMap
     gl.uniform1i @material.getUniform('normalTex'), 1
 
   setMatrixUniforms: (wvpMatrix, normalMatrix) ->

@@ -188,6 +188,8 @@ THE SOFTWARE.
       this.worldViewProjectionMatrix = mat4.create();
       this.children = [];
       this.visible = true;
+      this.metallic = Math.random();
+      this.roughness = Math.random();
     }
 
     Object3D.prototype.getWorldTransform = function() {
@@ -218,6 +220,8 @@ THE SOFTWARE.
       mat4.multiply(this.worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix);
       this.setMatrixUniforms(this.worldViewProjectionMatrix, this.normalMatrix);
       this.bindTextures();
+      gl.uniform1f(this.material.getUniform('roughness'), this.roughness);
+      gl.uniform1f(this.material.getUniform('metallic'), this.metallic);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vertexIndexBuffer.get());
       return gl.drawElements(gl.TRIANGLES, this.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
     };
@@ -1081,7 +1085,7 @@ THE SOFTWARE.
       PBRShader.__super__.constructor.call(this, this.program);
       this.metallic = 0.0;
       this.roughness = 0.0;
-      this.diffuseColor = new DFIR.Color();
+      this.diffuseColor = new DFIR.Color(0.2, 1.0, 1.0);
     }
 
     PBRShader.prototype.use = function() {
@@ -1693,7 +1697,6 @@ THE SOFTWARE.
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depthComponent, 0);
       status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       console.log("GBuffer FrameBuffer status after initialization: " + status);
-      this.mrt_ext.drawBuffersWEBGL([this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL]);
       return this.release();
     };
 
@@ -1725,10 +1728,12 @@ THE SOFTWARE.
     };
 
     Gbuffer.prototype.bind = function() {
-      return gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      return this.mrt_ext.drawBuffersWEBGL([this.mrt_ext.COLOR_ATTACHMENT0_WEBGL, this.mrt_ext.COLOR_ATTACHMENT1_WEBGL]);
     };
 
     Gbuffer.prototype.release = function() {
+      this.mrt_ext.drawBuffersWEBGL([gl.NONE]);
       return gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     };
 
@@ -2048,7 +2053,8 @@ THE SOFTWARE.
   })();
 
   DFIR.Renderer = (function() {
-    function Renderer(canvas) {
+    function Renderer(canvas, post_process_enabled) {
+      this.post_process_enabled = post_process_enabled != null ? post_process_enabled : false;
       this.ready = false;
       this.debug_view = 0;
       this.width = canvas ? canvas.width : window.innerWidth;
@@ -2081,10 +2087,12 @@ THE SOFTWARE.
       this.accumulationTexture = this.gbuffer.createTexture();
       this.frameBuffer = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      gl.bindTexture(gl.TEXTURE_2D, this.accumulationTexture);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.accumulationTexture, 0);
       status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       console.log("Final FrameBuffer status after initialization: " + status);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, null);
       DFIR.ShaderLoader.load('shaders/fs_quad_vert.glsl', 'shaders/fs_quad_frag.glsl', (function(_this) {
         return function(program) {
           _this.quad = new DFIR.FullscreenQuad();
@@ -2103,7 +2111,7 @@ THE SOFTWARE.
     };
 
     Renderer.prototype.setDefaults = function() {
-      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       gl.depthMask(true);
@@ -2146,6 +2154,9 @@ THE SOFTWARE.
       var l, len, light, ref;
       this.quad.material.use();
       this.quad.bind();
+      if (this.post_process_enabled) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+      }
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE);
       gl.activeTexture(gl.TEXTURE0);
@@ -2172,19 +2183,19 @@ THE SOFTWARE.
         gl.uniform1f(this.quad.material.getUniform('lightAttenuation'), light.attenuation);
         gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
       }
-      return this.quad.release();
+      this.quad.release();
+      if (this.post_process_enabled) {
+        return gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
     };
 
     Renderer.prototype.doPostProcess = function(scene, camera) {
-      gl.disable(gl.BLEND);
+      this.setDefaults();
       this.outputQuad.material.use();
       this.outputQuad.bind();
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
-      gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.accumulationTexture);
-      gl.uniform1i(this.outputQuad.material.getUniform('depthTexture'), 0);
-      gl.uniform1i(this.outputQuad.material.getUniform('renderTexture'), 1);
+      gl.uniform1i(this.outputQuad.material.getUniform('renderTexture'), 0);
       gl.uniform1i(this.outputQuad.material.getUniform('DEBUG'), this.debug_view);
       gl.uniform1f(this.outputQuad.material.getUniform('exposure'), this.exposure);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
@@ -2194,7 +2205,10 @@ THE SOFTWARE.
     Renderer.prototype.draw = function(scene, camera) {
       if (this.ready) {
         this.updateGBuffer(scene, camera);
-        return this.doLighting(scene, camera);
+        this.doLighting(scene, camera);
+        if (this.post_process_enabled) {
+          return this.doPostProcess(scene, camera);
+        }
       }
     };
 
