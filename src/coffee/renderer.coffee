@@ -95,11 +95,17 @@ class DFIR.Renderer
 
 	doLighting: (scene, camera) ->
 
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+			gl.clearColor 0.0, 0.0, 0.0, 1.0
+			gl.clear gl.COLOR_BUFFER_BIT
+			#gl.bindFramebuffer gl.FRAMEBUFFER, null
+			#return
+
 		@quad.material.use()
 		@quad.bind()
 
-		if @post_process_enabled
-			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+
 
 		gl.enable gl.BLEND
 		gl.blendFunc gl.ONE, gl.ONE
@@ -133,6 +139,10 @@ class DFIR.Renderer
 			gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
 		@quad.release()
+
+
+
+
 		if @post_process_enabled
 			gl.bindFramebuffer gl.FRAMEBUFFER, null
 
@@ -158,9 +168,14 @@ class DFIR.Renderer
 
 		@outputQuad.release()
 
+	reset: () ->
+		gl.viewport 0, 0, @width, @height
+		gl.enable gl.DEPTH_TEST
+		gl.enable gl.CULL_FACE
 
 	draw : (scene, camera) ->
 		if @ready
+			@reset()
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
 			if @post_process_enabled

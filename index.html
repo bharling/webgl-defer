@@ -57,13 +57,13 @@
 		scene = new DFIR.Scene();
 
 
-		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(-0.5, 1.0, 0.0), vec3.fromValues(1.0, 1.0, 1.0), 3.0));
+		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(-0.5, 1.0, 0.0), vec3.fromValues(0.98, 0.98, 1.0), 1.2));
 		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(0.5, 0.6, -0.3), vec3.fromValues(0.76, 0.6, 1.0)));
 		scene.directionalLights.push( new DFIR.DirectionalLight (vec3.fromValues(0.2, 0.8, 0.7), vec3.fromValues(0.9, 0.30, 0.0)));
 
 		console.log ( scene.directionalLights );
 
-		renderer = new DFIR.Renderer(canvas, false);
+		renderer = new DFIR.Renderer(canvas, true);
 
 		gui.add(renderer, 'debug_view',
 		{ 	'Full Render':0,
@@ -168,11 +168,12 @@
 
 	function updateScene(timeSinceLastFrame) {
 		camera.update();
-		//scene.root.rotateY(0.0005 * timeSinceLastFrame);
+		scene.root.rotateY(0.0003 * timeSinceLastFrame);
 	}
 
 	function drawScene() {
 		renderer.draw(scene, camera);
+		texturedebug([renderer.gbuffer.getNormalsTextureUnit(), renderer.gbuffer.getDepthTextureUnit(), renderer.accumulationTexture]);
 	}
 
 	function onSelectChange(value) {

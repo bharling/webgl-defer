@@ -138,31 +138,31 @@ pixelsToClip = ( pos ) ->
   return [px,py]
 
 class DFIR.Buffer
-  constructor: (data, @itemSize, mode, type) ->
+  constructor: (data, @itemSize, @mode, @type) ->
     # create an empty VBO
     
-    type ?= gl.ARRAY_BUFFER
+    @type ?= gl.ARRAY_BUFFER
     
     
     @buffer = gl.createBuffer()
     
     # bind it to use
-    gl.bindBuffer type, @buffer
+    gl.bindBuffer @type, @buffer
     
     # upload the data ( expecting data to be a Float32Array, and mode to be gl.STATIC_DRAW etc. )
-    gl.bufferData type, data, mode
+    gl.bufferData @type, data, @mode
     
     # cache number of items in this array
     @numItems = data.length / @itemSize
     
   bind: ->
-    gl.bindBuffer @buffer
+    gl.bindBuffer @type, @buffer
     
   get: ->
     return @buffer
     
   release: ->
-    gl.bindBuffer null
+    gl.bindBuffer @type, null
     
 
 class DFIR.Object2D
@@ -1623,6 +1623,95 @@ class DFIR.FullscreenQuad extends DFIR.Object3D
     
     
 
+initTexture = (width, height, format, attachment) ->
+
+
+class DFIR.FrameBuffer
+	constructor: (@width, @height, @colorTargets=1, @depthTarget=true) ->
+		@textures = []
+		@init()
+
+	check: ->
+		@ext = window.WEBGL_draw_buffers = gl.getExtension('WEBGL_draw_buffers')
+		if not @ext?
+			alert 'Draw Buffers unsupported'
+
+	init: ->
+		@fb = gl.createFramebuffer()
+		gl.bindFramebuffer(gl.FRAMEBUFFER, @fb)
+
+		for i in [0 ... @colorTargets]
+			@textures[i] = initTexture(@width, @height, gl.RGB4, gl.COLOR_ATTACHMENT0 + i)
+
+
+
+
+	bind: ->
+
+
+
+
+
+tCache = null
+debug_textures = []
+shader = null
+
+triangle = () ->
+	vao = tCache
+	if !vao?
+		verts = new Float32Array([-1, -1, -1, 4, 4, -1])
+		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT)
+		tCache = vao = buf
+		vao = buf
+
+	vao.bind()
+	gl.drawArrays(gl.TRIANGLES, 0, 3)
+	vao.release()
+
+
+texturedebug = (textures) ->
+	width = gl.drawingBufferWidth
+	height = gl.drawingBufferHeight
+
+	if not shader?
+		DFIR.ShaderLoader.load 'shaders/triangle_vert.glsl', 'shaders/triangle_frag.glsl', (program) ->
+			shader = new DFIR.Shader( program )
+
+	gl.bindFramebuffer gl.FRAMEBUFFER, null
+	gl.disable gl.DEPTH_TEST
+	gl.disable gl.CULL_FACE
+	gl.disable gl.BLEND
+
+	padding = 10
+	localWidth = width * 0.15
+	localHeight = localWidth * (height/width)
+	startX = width - localWidth - padding
+	startY = height - localHeight - padding
+
+	if shader?
+		shader.use()
+		gl.uniform2fv(shader.getUniform('res'), [localWidth, localHeight])
+
+		for i in [0...textures.length]
+			x = startX
+			y = startY - localHeight * i - padding * i
+
+			gl.viewport(x, y, localWidth, localHeight)
+			gl.activeTexture(gl.TEXTURE0)
+			gl.bindTexture(gl.TEXTURE_2D, textures[i])
+
+			gl.uniform1i(shader.getUniform('tex'), 0)
+
+			triangle()
+
+exports = if typeof exports isnt 'undefined' then exports else window
+exports.texturedebug = texturedebug
+
+
+
+
+
+
 class DebugView
   constructor: (@gbuffer, num_views=6) ->
     @depthTex = @gbuffer.getDepthTextureUnit()
@@ -1889,11 +1978,17 @@ class DFIR.Renderer
 
 	doLighting: (scene, camera) ->
 
+		if @post_process_enabled
+			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+			gl.clearColor 0.0, 0.0, 0.0, 1.0
+			gl.clear gl.COLOR_BUFFER_BIT
+			#gl.bindFramebuffer gl.FRAMEBUFFER, null
+			#return
+
 		@quad.material.use()
 		@quad.bind()
 
-		if @post_process_enabled
-			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
+
 
 		gl.enable gl.BLEND
 		gl.blendFunc gl.ONE, gl.ONE
@@ -1927,6 +2022,10 @@ class DFIR.Renderer
 			gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
 		@quad.release()
+
+
+
+
 		if @post_process_enabled
 			gl.bindFramebuffer gl.FRAMEBUFFER, null
 
@@ -1952,9 +2051,14 @@ class DFIR.Renderer
 
 		@outputQuad.release()
 
+	reset: () ->
+		gl.viewport 0, 0, @width, @height
+		gl.enable gl.DEPTH_TEST
+		gl.enable gl.CULL_FACE
 
 	draw : (scene, camera) ->
 		if @ready
+			@reset()
 			@updateGBuffer(scene, camera)
 			@doLighting(scene, camera)
 			if @post_process_enabled

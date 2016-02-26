@@ -17,9 +17,13 @@ module.exports = (grunt) ->
     'src/coffee/shadows.coffee',
     'src/coffee/Gbuffer.coffee',
     'src/coffee/fullscreenQuad.coffee',
+    'src/coffee/framebuffer.coffee',
+    'src/coffee/texturedebug.coffee',
     'src/coffee/debug_view.coffee',
     'src/coffee/scene.coffee',
-    'src/coffee/renderer.coffee',]
+    'src/coffee/renderer.coffee',
+
+  ]
 
 
 

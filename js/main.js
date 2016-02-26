@@ -27,7 +27,7 @@ THE SOFTWARE.
  */
 
 (function() {
-  var DFIR, DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader_type_enums, value,
+  var DFIR, DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, debug_textures, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, initTexture, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader, shader_type_enums, tCache, texturedebug, triangle, value,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -143,19 +143,21 @@ THE SOFTWARE.
   };
 
   DFIR.Buffer = (function() {
-    function Buffer(data, itemSize, mode, type) {
+    function Buffer(data, itemSize, mode, type1) {
       this.itemSize = itemSize;
-      if (type == null) {
-        type = gl.ARRAY_BUFFER;
+      this.mode = mode;
+      this.type = type1;
+      if (this.type == null) {
+        this.type = gl.ARRAY_BUFFER;
       }
       this.buffer = gl.createBuffer();
-      gl.bindBuffer(type, this.buffer);
-      gl.bufferData(type, data, mode);
+      gl.bindBuffer(this.type, this.buffer);
+      gl.bufferData(this.type, data, this.mode);
       this.numItems = data.length / this.itemSize;
     }
 
     Buffer.prototype.bind = function() {
-      return gl.bindBuffer(this.buffer);
+      return gl.bindBuffer(this.type, this.buffer);
     };
 
     Buffer.prototype.get = function() {
@@ -163,7 +165,7 @@ THE SOFTWARE.
     };
 
     Buffer.prototype.release = function() {
-      return gl.bindBuffer(null);
+      return gl.bindBuffer(this.type, null);
     };
 
     return Buffer;
@@ -1841,6 +1843,101 @@ THE SOFTWARE.
 
   })(DFIR.Object3D);
 
+  initTexture = function(width, height, format, attachment) {};
+
+  DFIR.FrameBuffer = (function() {
+    function FrameBuffer(width1, height1, colorTargets, depthTarget) {
+      this.width = width1;
+      this.height = height1;
+      this.colorTargets = colorTargets != null ? colorTargets : 1;
+      this.depthTarget = depthTarget != null ? depthTarget : true;
+      this.textures = [];
+      this.init();
+    }
+
+    FrameBuffer.prototype.check = function() {
+      this.ext = window.WEBGL_draw_buffers = gl.getExtension('WEBGL_draw_buffers');
+      if (this.ext == null) {
+        return alert('Draw Buffers unsupported');
+      }
+    };
+
+    FrameBuffer.prototype.init = function() {
+      var i, l, ref, results;
+      this.fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fb);
+      results = [];
+      for (i = l = 0, ref = this.colorTargets; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
+        results.push(this.textures[i] = initTexture(this.width, this.height, gl.RGB4, gl.COLOR_ATTACHMENT0 + i));
+      }
+      return results;
+    };
+
+    FrameBuffer.prototype.bind = function() {};
+
+    return FrameBuffer;
+
+  })();
+
+  tCache = null;
+
+  debug_textures = [];
+
+  shader = null;
+
+  triangle = function() {
+    var buf, vao, verts;
+    vao = tCache;
+    if (vao == null) {
+      verts = new Float32Array([-1, -1, -1, 4, 4, -1]);
+      buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT);
+      tCache = vao = buf;
+      vao = buf;
+    }
+    vao.bind();
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return vao.release();
+  };
+
+  texturedebug = function(textures) {
+    var height, i, l, localHeight, localWidth, padding, ref, results, startX, startY, width, x, y;
+    width = gl.drawingBufferWidth;
+    height = gl.drawingBufferHeight;
+    if (shader == null) {
+      DFIR.ShaderLoader.load('shaders/triangle_vert.glsl', 'shaders/triangle_frag.glsl', function(program) {
+        return shader = new DFIR.Shader(program);
+      });
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.BLEND);
+    padding = 10;
+    localWidth = width * 0.15;
+    localHeight = localWidth * (height / width);
+    startX = width - localWidth - padding;
+    startY = height - localHeight - padding;
+    if (shader != null) {
+      shader.use();
+      gl.uniform2fv(shader.getUniform('res'), [localWidth, localHeight]);
+      results = [];
+      for (i = l = 0, ref = textures.length; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
+        x = startX;
+        y = startY - localHeight * i - padding * i;
+        gl.viewport(x, y, localWidth, localHeight);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[i]);
+        gl.uniform1i(shader.getUniform('tex'), 0);
+        results.push(triangle());
+      }
+      return results;
+    }
+  };
+
+  exports = typeof exports !== 'undefined' ? exports : window;
+
+  exports.texturedebug = texturedebug;
+
   DebugView = (function() {
     function DebugView(gbuffer, num_views) {
       this.gbuffer = gbuffer;
@@ -2152,11 +2249,13 @@ THE SOFTWARE.
 
     Renderer.prototype.doLighting = function(scene, camera) {
       var l, len, light, ref;
-      this.quad.material.use();
-      this.quad.bind();
       if (this.post_process_enabled) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
       }
+      this.quad.material.use();
+      this.quad.bind();
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE);
       gl.activeTexture(gl.TEXTURE0);
@@ -2202,8 +2301,15 @@ THE SOFTWARE.
       return this.outputQuad.release();
     };
 
+    Renderer.prototype.reset = function() {
+      gl.viewport(0, 0, this.width, this.height);
+      gl.enable(gl.DEPTH_TEST);
+      return gl.enable(gl.CULL_FACE);
+    };
+
     Renderer.prototype.draw = function(scene, camera) {
       if (this.ready) {
+        this.reset();
         this.updateGBuffer(scene, camera);
         this.doLighting(scene, camera);
         if (this.post_process_enabled) {
