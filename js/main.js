@@ -1890,7 +1890,7 @@ THE SOFTWARE.
     vao = tCache;
     if (vao == null) {
       verts = new Float32Array([-1, -1, -1, 4, 4, -1]);
-      buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT);
+      buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW);
       tCache = vao = buf;
       vao = buf;
     }
@@ -2171,6 +2171,7 @@ THE SOFTWARE.
       this.createTargets();
       this.setDefaults();
       this.drawCallCount = 0;
+      this.tonemap = 0;
     }
 
     Renderer.prototype.checkReadiness = function() {
@@ -2297,6 +2298,7 @@ THE SOFTWARE.
       gl.uniform1i(this.outputQuad.material.getUniform('renderTexture'), 0);
       gl.uniform1i(this.outputQuad.material.getUniform('DEBUG'), this.debug_view);
       gl.uniform1f(this.outputQuad.material.getUniform('exposure'), this.exposure);
+      gl.uniform1i(this.outputQuad.material.getUniform('tonemap'), this.tonemap);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
       return this.outputQuad.release();
     };

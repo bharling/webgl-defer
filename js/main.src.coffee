@@ -1660,7 +1660,7 @@ triangle = () ->
 	vao = tCache
 	if !vao?
 		verts = new Float32Array([-1, -1, -1, 4, 4, -1])
-		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT)
+		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW)
 		tCache = vao = buf
 		vao = buf
 
@@ -1706,11 +1706,6 @@ texturedebug = (textures) ->
 
 exports = if typeof exports isnt 'undefined' then exports else window
 exports.texturedebug = texturedebug
-
-
-
-
-
 
 class DebugView
   constructor: (@gbuffer, num_views=6) ->
@@ -1901,6 +1896,7 @@ class DFIR.Renderer
 		@createTargets()
 		@setDefaults()
 		@drawCallCount = 0
+		@tonemap = 0
 
 
 	checkReadiness: ->
@@ -2046,6 +2042,7 @@ class DFIR.Renderer
 
 		gl.uniform1i(@outputQuad.material.getUniform('DEBUG'), @debug_view)
 		gl.uniform1f(@outputQuad.material.getUniform('exposure'), @exposure)
+		gl.uniform1i(@outputQuad.material.getUniform('tonemap'), @tonemap)
 
 		gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
