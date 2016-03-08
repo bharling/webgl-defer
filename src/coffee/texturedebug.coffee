@@ -6,7 +6,7 @@ triangle = () ->
 	vao = tCache
 	if !vao?
 		verts = new Float32Array([-1, -1, -1, 4, 4, -1])
-		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT)
+		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW)
 		tCache = vao = buf
 		vao = buf
 

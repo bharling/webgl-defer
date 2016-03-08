@@ -27,7 +27,7 @@ THE SOFTWARE.
  */
 
 (function() {
-  var DFIR, DebugView, InertialValue, InertialVector, Pointer, buildProgram, buildProgramFromStrings, buildShaderProgram, debug_textures, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, initTexture, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader, shader_type_enums, tCache, texturedebug, triangle, value,
+  var DFIR, DebugView, InertialValue, InertialVector, Pointer, VertexFormat, buildProgram, buildProgramFromStrings, buildShaderProgram, debug_textures, exports, fs_quad_fragment_shader, fs_quad_vertex_shader, getShader, getShaderParams, initTexture, keymap, keys, loadJSON, loadResource, loadShaderAjax, loadTexture, mergeVertices, name, pixelsToClip, shader, shader_type_enums, stringFromUint, tCache, texturedebug, triangle, value,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -192,7 +192,13 @@ THE SOFTWARE.
       this.visible = true;
       this.metallic = Math.random();
       this.roughness = Math.random();
+      this.material = null;
+      this.loaded = false;
     }
+
+    Object3D.prototype.setMaterial = function(shader) {
+      return this.material = shader;
+    };
 
     Object3D.prototype.getWorldTransform = function() {
       if (this.transformDirty === true) {
@@ -235,6 +241,14 @@ THE SOFTWARE.
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.material.normalMap);
       return gl.uniform1i(this.material.getUniform('normalTex'), 1);
+    };
+
+    Object3D.prototype.setFloatUniform = function(name, val) {
+      return gl.uniform1f(this.material.getUniform(name), val);
+    };
+
+    Object3D.prototype.setVec4Uniform = function(name, x, y, z, w) {
+      return gl.uniform4f(this.material.getUniform(name), x, y, z, w);
     };
 
     Object3D.prototype.setMatrixUniforms = function(wvpMatrix, normalMatrix) {
@@ -327,26 +341,55 @@ THE SOFTWARE.
       return Scene.__super__.constructor.apply(this, arguments);
     }
 
+    null;
+
     return Scene;
 
   })(DFIR.Object3D);
 
-  DFIR.Mesh = (function(superClass) {
-    extend(Mesh, superClass);
+  DFIR.MeshObject = (function(superClass) {
+    extend(MeshObject, superClass);
 
-    function Mesh(geometry, shader1) {
-      this.geometry = geometry;
-      this.shader = shader1;
-      Mesh.__super__.constructor.call(this);
-      if (this.geometry == null) {
-        this.geometry = new DFIR.Geometry();
-      }
-      if (this.shader == null) {
-        this.shader = new DFIR.BasicShader();
-      }
+    function MeshObject(mesh) {
+      this.mesh = mesh;
+      MeshObject.__super__.constructor.call(this);
     }
 
-    return Mesh;
+    MeshObject.prototype.bind = function() {
+      var normalsAttrib, positionAttrib, texCoordsAttrib;
+      if (!this.material || !this.material.diffuseMapLoaded || !this.material.normalMapLoaded || !this.mesh.ready) {
+        return false;
+      }
+      this.material.use();
+      positionAttrib = this.material.getAttribute('aVertexPosition');
+      texCoordsAttrib = this.material.getAttribute('aVertexTextureCoords');
+      normalsAttrib = this.material.getAttribute('aVertexNormal');
+      return this.mesh.bind(positionAttrib, normalsAttrib, texCoordsAttrib);
+    };
+
+    MeshObject.prototype.release = function() {
+      return gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    };
+
+    MeshObject.prototype.draw = function(camera, worldMatrix) {
+      if (!this.material || !this.mesh.ready) {
+        return;
+      }
+      this.material.use();
+      this.update();
+      if (worldMatrix == null) {
+        worldMatrix = this.transform;
+      }
+      this.getNormalMatrix(camera, worldMatrix);
+      mat4.multiply(this.worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix);
+      this.setMatrixUniforms(this.worldViewProjectionMatrix, this.normalMatrix);
+      this.bindTextures();
+      gl.uniform1f(this.material.getUniform('roughness'), this.roughness);
+      gl.uniform1f(this.material.getUniform('metallic'), this.metallic);
+      return gl.drawArrays(gl.TRIANGLES, 0, this.mesh.vertexLength);
+    };
+
+    return MeshObject;
 
   })(DFIR.Object3D);
 
@@ -444,6 +487,101 @@ THE SOFTWARE.
 
   })(DFIR.Geometry);
 
+  VertexFormat = {
+    Position: 0x0001,
+    UV: 0x0002,
+    UV2: 0x0004,
+    Normal: 0x0008,
+    Color: 0x0010
+  };
+
+  stringFromUint = function(num) {
+    var s;
+    s = "";
+    s += String.fromCharCode(num & 0xff);
+    s += String.fromCharCode((num >> 8) & 0xff);
+    s += String.fromCharCode((num >> 16) & 0xff);
+    s += String.fromCharCode((num >> 24) & 0xff);
+    return s;
+  };
+
+  DFIR.Mesh = (function() {
+    function Mesh(url) {
+      this.load(url);
+      this.ready = false;
+    }
+
+    Mesh.prototype.load = function(url) {
+      var modelComplete, modelXHR, self, vertComplete, vertXHR;
+      self = this;
+      vertComplete = false;
+      modelComplete = false;
+      vertXHR = new XMLHttpRequest();
+      vertXHR.open('GET', url);
+      vertXHR.responseType = 'arraybuffer';
+      vertXHR.onload = function() {
+        var arrays;
+        arrays = self.parseBinary(this.response);
+        self.compileBuffers(arrays);
+        vertComplete = true;
+        self.ready = true;
+        if (self.modelComplete) {
+          return something;
+        }
+      };
+      vertXHR.send(null);
+      return modelXHR = new XMLHttpRequest();
+    };
+
+    Mesh.prototype.parseBinary = function(data) {
+      var header, indexLength, indices, magic, vertLength, vertices;
+      header = new Uint32Array(data, 0, 3);
+      magic = header[0], vertLength = header[1], indexLength = header[2];
+      magic = stringFromUint(magic);
+      if (magic !== 'DFIR') {
+        console.error("Magic String, she no match");
+      }
+      console.log(vertLength + " vertices, " + indexLength + " indices");
+      vertices = new Float32Array(data, 3 * 4, vertLength);
+      indices = new Uint16Array(data, (3 * 4) + (vertLength * 4), indexLength);
+      this.vertexLength = vertLength / 8;
+      this.indexLength = indexLength;
+      return [vertices, indices];
+    };
+
+    Mesh.prototype.parseJSON = function(data) {};
+
+    Mesh.prototype.compileBuffers = function(arrays) {
+      this.vertexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, arrays[0], gl.STATIC_DRAW);
+      this.indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrays[1], gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+      return this.vertexStride = 32;
+    };
+
+    Mesh.prototype.bind = function(positionAttrib, normalsAttrib, uvAttrib) {
+      if (!this.ready) {
+        return false;
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+      gl.enableVertexAttribArray(positionAttrib);
+      gl.vertexAttribPointer(positionAttrib, 3, gl.FLOAT, false, this.vertexStride, 0);
+      gl.enableVertexAttribArray(normalsAttrib);
+      gl.vertexAttribPointer(normalsAttrib, 3, gl.FLOAT, true, this.vertexStride, 12);
+      gl.enableVertexAttribArray(uvAttrib);
+      gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, this.vertexStride, 24);
+      return true;
+    };
+
+    return Mesh;
+
+  })();
+
   loadJSON = function(url, callback) {
     var key, request;
     key = md5(url);
@@ -473,13 +611,7 @@ THE SOFTWARE.
       this.onDataLoaded = bind(this.onDataLoaded, this);
       JSONGeometry.__super__.constructor.call(this);
       loadJSON(url, this.onDataLoaded);
-      this.material = null;
-      this.loaded = false;
     }
-
-    JSONGeometry.prototype.setMaterial = function(shader) {
-      return this.material = shader;
-    };
 
     JSONGeometry.prototype.bind = function() {
       var normalsAttrib, positionAttrib, texCoordsAttrib;
@@ -504,14 +636,6 @@ THE SOFTWARE.
 
     JSONGeometry.prototype.release = function() {
       return gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    };
-
-    JSONGeometry.prototype.setFloatUniform = function(name, val) {
-      return gl.uniform1f(this.material.getUniform(name), val);
-    };
-
-    JSONGeometry.prototype.setVec4Uniform = function(name, x, y, z, w) {
-      return gl.uniform4f(this.material.getUniform(name), x, y, z, w);
     };
 
     JSONGeometry.prototype.onDataLoaded = function(data) {
@@ -1890,7 +2014,7 @@ THE SOFTWARE.
     vao = tCache;
     if (vao == null) {
       verts = new Float32Array([-1, -1, -1, 4, 4, -1]);
-      buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT);
+      buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW);
       tCache = vao = buf;
       vao = buf;
     }

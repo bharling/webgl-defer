@@ -183,6 +183,12 @@ class DFIR.Object3D
     @visible = true
     @metallic = Math.random()
     @roughness = Math.random()
+    @material = null
+    @loaded = false
+
+
+  setMaterial : (shader) ->
+    @material = shader
 
   getWorldTransform: () ->
     if @transformDirty is true
@@ -227,6 +233,12 @@ class DFIR.Object3D
     gl.activeTexture gl.TEXTURE1
     gl.bindTexture gl.TEXTURE_2D, @material.normalMap
     gl.uniform1i @material.getUniform('normalTex'), 1
+
+  setFloatUniform: (name, val) ->
+    gl.uniform1f @material.getUniform(name), val
+
+  setVec4Uniform: (name, x, y, z, w) ->
+    gl.uniform4f @material.getUniform(name), x, y, z, w
 
   setMatrixUniforms: (wvpMatrix, normalMatrix) ->
     if !@material
@@ -288,13 +300,53 @@ class DFIR.Object3D
 
 
 class DFIR.Scene extends DFIR.Object3D
+  null
 
-class DFIR.Mesh extends DFIR.Object3D
-  constructor: (@geometry, @shader) ->
+
+class DFIR.MeshObject extends DFIR.Object3D
+  constructor: (@mesh) ->
     super()
-    @geometry ?= new DFIR.Geometry()
-    @shader ?= new DFIR.BasicShader()
 
+
+  bind : ->
+    if !@material or !@material.diffuseMapLoaded or !@material.normalMapLoaded or !@mesh.ready
+      return false
+
+    @material.use()
+
+    positionAttrib = @material.getAttribute( 'aVertexPosition')
+    texCoordsAttrib = @material.getAttribute( 'aVertexTextureCoords')
+    normalsAttrib = @material.getAttribute( 'aVertexNormal' )
+
+    return @mesh.bind positionAttrib, normalsAttrib, texCoordsAttrib
+
+  release: ->
+    gl.bindBuffer gl.ARRAY_BUFFER, null
+
+  draw: (camera, worldMatrix) ->
+    if !@material or !@mesh.ready
+      return
+    @material.use()
+    @update()
+    worldMatrix ?= @transform
+    @getNormalMatrix(camera, worldMatrix)
+
+    mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
+
+
+    #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
+
+    @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
+    @bindTextures()
+
+    gl.uniform1f @material.getUniform('roughness'), @roughness
+    gl.uniform1f @material.getUniform('metallic'), @metallic
+
+    #gl.drawElements gl.TRIANGLES, @mesh.indexLength, gl.UNSIGNED_SHORT, 0
+
+    gl.drawArrays gl.TRIANGLES, 0, @mesh.vertexLength
 # taken from threejs
 mergeVertices = (vertices, faces) ->
   verticesMap = {}
@@ -376,6 +428,114 @@ class DFIR.SphereGeometry extends DFIR.Geometry
   constructor: (rings) ->
     super()
 
+
+VertexFormat =
+	Position: 0x0001
+	UV : 0x0002
+	UV2 : 0x0004
+	Normal : 0x0008
+	Color: 0x0010
+
+
+stringFromUint = (num) ->
+	s = ""
+	s += String.fromCharCode(num & 0xff)
+	s += String.fromCharCode((num >> 8) & 0xff)
+	s += String.fromCharCode((num >> 16) & 0xff)
+	s += String.fromCharCode((num >> 24) & 0xff)
+	return s
+
+class DFIR.Mesh
+	constructor : (url) ->
+		@load url
+		@ready = false
+
+	load: (url) ->
+		self = this
+		vertComplete = false
+		modelComplete = false
+
+		# load vertex / index buffers
+		vertXHR = new XMLHttpRequest()
+		vertXHR.open('GET', url)
+		vertXHR.responseType = 'arraybuffer'
+		vertXHR.onload = () ->
+			arrays = self.parseBinary @response
+			self.compileBuffers arrays
+			vertComplete = true
+			self.ready = true
+
+			if self.modelComplete
+				something
+		vertXHR.send null
+
+		# load json stuff
+		modelXHR = new XMLHttpRequest()
+
+	parseBinary: (data) ->
+		header = new Uint32Array data, 0, 3
+		[magic, vertLength, indexLength] = header
+		magic = stringFromUint magic
+
+		if magic != 'DFIR'
+			console.error "Magic String, she no match"
+
+		console.log "#{vertLength} vertices, #{indexLength} indices"
+
+		vertices = new Float32Array data, 3*4, vertLength
+		indices = new Uint16Array data, (3*4) + (vertLength*4), indexLength
+
+		@vertexLength = vertLength / 8
+
+		@indexLength = indexLength
+
+		[vertices, indices]
+
+	parseJSON: (data) ->
+
+
+	compileBuffers: (arrays) ->
+		# vertexBuffer looks like this:
+
+		# [vx, vy, vz, nx, ny, nz, uvx, uvy] = all float32.
+		# therefore, stride = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 = 32 bytes
+
+		@vertexBuffer = gl.createBuffer()
+		gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+		gl.bufferData gl.ARRAY_BUFFER, arrays[0], gl.STATIC_DRAW
+
+		@indexBuffer = gl.createBuffer()
+		gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+		gl.bufferData gl.ELEMENT_ARRAY_BUFFER, arrays[1], gl.STATIC_DRAW
+
+		gl.bindBuffer gl.ARRAY_BUFFER, null
+		gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, null
+
+		@vertexStride = 32
+
+	bind: (positionAttrib, normalsAttrib, uvAttrib) ->
+
+		if !@ready
+			return false
+
+		# bind our buffers
+		gl.bindBuffer gl.ARRAY_BUFFER, @vertexBuffer
+		gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, @indexBuffer
+
+		# bind to attribute pointers
+		gl.enableVertexAttribArray positionAttrib
+		gl.vertexAttribPointer positionAttrib, 3, gl.FLOAT, false, @vertexStride, 0
+
+		gl.enableVertexAttribArray normalsAttrib
+		gl.vertexAttribPointer normalsAttrib, 3, gl.FLOAT, true, @vertexStride, 12
+
+		gl.enableVertexAttribArray uvAttrib
+		gl.vertexAttribPointer uvAttrib, 2, gl.FLOAT, false, @vertexStride, 24
+
+		return true
+
+
+
 loadJSON = (url, callback) ->
   key = md5(url)
   if DFIR.Geometry.meshCache[key]?
@@ -399,14 +559,6 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   constructor: (url) ->
     super()
     loadJSON url, @onDataLoaded
-    @material = null
-    @loaded = false
-
-
-  setMaterial : (shader) ->
-    @material = shader
-
-
 
   bind : ->
     if !@material or !@loaded or !@material.diffuseMapLoaded or !@material.normalMapLoaded
@@ -442,11 +594,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   #  gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, mvMatrix
   #  gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, pMatrix
 
-  setFloatUniform: (name, val) ->
-    gl.uniform1f @material.getUniform(name), val
 
-  setVec4Uniform: (name, x, y, z, w) ->
-    gl.uniform4f @material.getUniform(name), x, y, z, w
 
 
   #draw : ->
@@ -1643,6 +1791,8 @@ class DFIR.FrameBuffer
 		for i in [0 ... @colorTargets]
 			@textures[i] = initTexture(@width, @height, gl.RGB4, gl.COLOR_ATTACHMENT0 + i)
 
+		
+
 
 
 
@@ -1660,7 +1810,7 @@ triangle = () ->
 	vao = tCache
 	if !vao?
 		verts = new Float32Array([-1, -1, -1, 4, 4, -1])
-		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW, gl.FLOAT)
+		buf = new DFIR.Buffer(verts, 2, gl.STATIC_DRAW)
 		tCache = vao = buf
 		vao = buf
 

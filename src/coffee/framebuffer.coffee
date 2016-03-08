@@ -18,6 +18,8 @@ class DFIR.FrameBuffer
 		for i in [0 ... @colorTargets]
 			@textures[i] = initTexture(@width, @height, gl.RGB4, gl.COLOR_ATTACHMENT0 + i)
 
+		
+
 
 
 

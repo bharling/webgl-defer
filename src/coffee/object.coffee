@@ -16,6 +16,12 @@ class DFIR.Object3D
     @visible = true
     @metallic = Math.random()
     @roughness = Math.random()
+    @material = null
+    @loaded = false
+
+
+  setMaterial : (shader) ->
+    @material = shader
 
   getWorldTransform: () ->
     if @transformDirty is true
@@ -60,6 +66,12 @@ class DFIR.Object3D
     gl.activeTexture gl.TEXTURE1
     gl.bindTexture gl.TEXTURE_2D, @material.normalMap
     gl.uniform1i @material.getUniform('normalTex'), 1
+
+  setFloatUniform: (name, val) ->
+    gl.uniform1f @material.getUniform(name), val
+
+  setVec4Uniform: (name, x, y, z, w) ->
+    gl.uniform4f @material.getUniform(name), x, y, z, w
 
   setMatrixUniforms: (wvpMatrix, normalMatrix) ->
     if !@material
@@ -121,9 +133,50 @@ class DFIR.Object3D
 
 
 class DFIR.Scene extends DFIR.Object3D
+  null
 
-class DFIR.Mesh extends DFIR.Object3D
-  constructor: (@geometry, @shader) ->
+
+class DFIR.MeshObject extends DFIR.Object3D
+  constructor: (@mesh) ->
     super()
-    @geometry ?= new DFIR.Geometry()
-    @shader ?= new DFIR.BasicShader()
+
+
+  bind : ->
+    if !@material or !@material.diffuseMapLoaded or !@material.normalMapLoaded or !@mesh.ready
+      return false
+
+    @material.use()
+
+    positionAttrib = @material.getAttribute( 'aVertexPosition')
+    texCoordsAttrib = @material.getAttribute( 'aVertexTextureCoords')
+    normalsAttrib = @material.getAttribute( 'aVertexNormal' )
+
+    return @mesh.bind positionAttrib, normalsAttrib, texCoordsAttrib
+
+  release: ->
+    gl.bindBuffer gl.ARRAY_BUFFER, null
+
+  draw: (camera, worldMatrix) ->
+    if !@material or !@mesh.ready
+      return
+    @material.use()
+    @update()
+    worldMatrix ?= @transform
+    @getNormalMatrix(camera, worldMatrix)
+
+    mat4.multiply @worldViewProjectionMatrix, camera.getViewProjectionMatrix(), worldMatrix
+
+
+    #worldViewProjectionMatrix = mat4.clone camera.getProjectionMatrix()
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, camera.getViewMatrix())
+    #mat4.multiply(worldViewProjectionMatrix, worldViewProjectionMatrix, worldMatrix)
+
+    @setMatrixUniforms(@worldViewProjectionMatrix, @normalMatrix)
+    @bindTextures()
+
+    gl.uniform1f @material.getUniform('roughness'), @roughness
+    gl.uniform1f @material.getUniform('metallic'), @metallic
+
+    #gl.drawElements gl.TRIANGLES, @mesh.indexLength, gl.UNSIGNED_SHORT, 0
+
+    gl.drawArrays gl.TRIANGLES, 0, @mesh.vertexLength

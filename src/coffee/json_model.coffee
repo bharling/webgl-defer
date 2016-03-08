@@ -21,14 +21,6 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   constructor: (url) ->
     super()
     loadJSON url, @onDataLoaded
-    @material = null
-    @loaded = false
-
-
-  setMaterial : (shader) ->
-    @material = shader
-
-
 
   bind : ->
     if !@material or !@loaded or !@material.diffuseMapLoaded or !@material.normalMapLoaded
@@ -64,11 +56,7 @@ class DFIR.JSONGeometry extends DFIR.Object3D
   #  gl.uniformMatrix4fv @material.getUniform( 'uMVMatrix' ), false, mvMatrix
   #  gl.uniformMatrix4fv @material.getUniform( 'uPMatrix'), false, pMatrix
 
-  setFloatUniform: (name, val) ->
-    gl.uniform1f @material.getUniform(name), val
 
-  setVec4Uniform: (name, x, y, z, w) ->
-    gl.uniform4f @material.getUniform(name), x, y, z, w
 
 
   #draw : ->
