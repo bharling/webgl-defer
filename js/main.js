@@ -2296,6 +2296,7 @@ THE SOFTWARE.
       this.createTargets();
       this.setDefaults();
       this.drawCallCount = 0;
+      this.tonemap = 0;
     }
 
     Renderer.prototype.checkReadiness = function() {
@@ -2374,6 +2375,7 @@ THE SOFTWARE.
 
     Renderer.prototype.doLighting = function(scene, camera) {
       var l, len, light, ref;
+      gl.enable(gl.BLEND);
       if (this.post_process_enabled) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -2428,6 +2430,7 @@ THE SOFTWARE.
       gl.uniform1i(this.outputQuad.material.getUniform('renderTexture'), 0);
       gl.uniform1i(this.outputQuad.material.getUniform('DEBUG'), this.debug_view);
       gl.uniform1f(this.outputQuad.material.getUniform('exposure'), this.exposure);
+      gl.uniform1i(this.outputQuad.material.getUniform('tonemap'), this.tonemap);
       gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
       return this.outputQuad.release();
     };

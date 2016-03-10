@@ -18,6 +18,7 @@ class DFIR.Renderer
 		@createTargets()
 		@setDefaults()
 		@drawCallCount = 0
+		@tonemap = 0
 
 
 	checkReadiness: ->
@@ -94,7 +95,7 @@ class DFIR.Renderer
 
 
 	doLighting: (scene, camera) ->
-
+		gl.enable gl.BLEND
 		if @post_process_enabled
 			gl.bindFramebuffer gl.FRAMEBUFFER, @frameBuffer
 			gl.clearColor 0.0, 0.0, 0.0, 1.0
@@ -165,6 +166,7 @@ class DFIR.Renderer
 
 		gl.uniform1i(@outputQuad.material.getUniform('DEBUG'), @debug_view)
 		gl.uniform1f(@outputQuad.material.getUniform('exposure'), @exposure)
+		gl.uniform1i(@outputQuad.material.getUniform('tonemap'), @tonemap)
 
 		gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 

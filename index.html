@@ -66,7 +66,8 @@
 		renderer = new DFIR.Renderer(canvas, true);
 
 		gui.add(renderer, 'debug_view',
-		{ 	'Full Render':0,
+		{
+			'Full Render':0,
 			'Depth':1,
 			'Compressed Normal':2,
 			'Albedo':3,
@@ -75,6 +76,16 @@
 			'View Space Position':6 }
 		);
 		gui.add(renderer, 'exposure', 0.0, 2.0);
+
+
+
+		gui.add(renderer, 'tonemap', {
+				'Reinhardt': 0,
+				'Linear': 1,
+				'Hejl - Dawson': 2,
+				'Uncharted 2': 3
+		});
+
 		//gui.add(this, "times");
 
 		camera = new DFIR.QuaternionCamera(canvas.clientWidth, canvas.clientHeight, canvas)
