@@ -105,11 +105,6 @@ class DFIR.Renderer
 		@quad.material.use()
 		@quad.bind()
 
-
-
-		gl.enable gl.BLEND
-		gl.blendFunc gl.ONE, gl.ONE
-
 		gl.activeTexture(gl.TEXTURE0)
 		gl.bindTexture(gl.TEXTURE_2D, @gbuffer.getDepthTextureUnit())
 
@@ -131,11 +126,18 @@ class DFIR.Renderer
 
 		# draw directional lights
 
-		for light in scene.directionalLights
-			gl.uniform3fv(@quad.material.getUniform('lightDirection'), light.position)
-			gl.uniform3fv(@quad.material.getUniform('lightColor'), light.color)
-			gl.uniform1f(@quad.material.getUniform('lightStrength'), light.strength)
-			gl.uniform1f(@quad.material.getUniform('lightAttenuation'), light.attenuation)
+		if @debug_view is 0
+			gl.enable gl.BLEND
+			gl.blendFunc gl.ONE, gl.ONE
+			for light in scene.directionalLights
+				gl.uniform3fv(@quad.material.getUniform('lightDirection'), light.position)
+				gl.uniform3fv(@quad.material.getUniform('lightColor'), light.color)
+				gl.uniform1f(@quad.material.getUniform('lightStrength'), light.strength)
+				gl.uniform1f(@quad.material.getUniform('lightAttenuation'), light.attenuation)
+				gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
+		else
+			gl.disable gl.BLEND
+			gl.blendFunc gl.ONE, gl.ZERO
 			gl.drawArrays(gl.TRIANGLES, 0, @quad.vertexBuffer.numItems)
 
 		@quad.release()

@@ -177,6 +177,6 @@ class DFIR.MeshObject extends DFIR.Object3D
     gl.uniform1f @material.getUniform('roughness'), @roughness
     gl.uniform1f @material.getUniform('metallic'), @metallic
 
-    #gl.drawElements gl.TRIANGLES, @mesh.indexLength, gl.UNSIGNED_SHORT, 0
+    gl.drawElements gl.TRIANGLES, @mesh.indexLength, gl.UNSIGNED_SHORT, 0
 
-    gl.drawArrays gl.TRIANGLES, 0, @mesh.vertexLength
+    #gl.drawArrays gl.TRIANGLES, 0, @mesh.vertexLength

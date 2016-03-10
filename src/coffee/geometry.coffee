@@ -140,6 +140,8 @@ class DFIR.Mesh
 
 		@indexLength = indexLength
 
+		console.log indices, indexLength
+
 		[vertices, indices]
 
 	parseJSON: (data) ->

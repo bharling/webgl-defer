@@ -386,7 +386,7 @@ THE SOFTWARE.
       this.bindTextures();
       gl.uniform1f(this.material.getUniform('roughness'), this.roughness);
       gl.uniform1f(this.material.getUniform('metallic'), this.metallic);
-      return gl.drawArrays(gl.TRIANGLES, 0, this.mesh.vertexLength);
+      return gl.drawElements(gl.TRIANGLES, this.mesh.indexLength, gl.UNSIGNED_SHORT, 0);
     };
 
     return MeshObject;
@@ -546,6 +546,7 @@ THE SOFTWARE.
       indices = new Uint16Array(data, (3 * 4) + (vertLength * 4), indexLength);
       this.vertexLength = vertLength / 8;
       this.indexLength = indexLength;
+      console.log(indices, indexLength);
       return [vertices, indices];
     };
 
@@ -2380,8 +2381,6 @@ THE SOFTWARE.
       }
       this.quad.material.use();
       this.quad.bind();
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.gbuffer.getDepthTextureUnit());
       gl.activeTexture(gl.TEXTURE1);
@@ -2397,13 +2396,21 @@ THE SOFTWARE.
       gl.uniformMatrix4fv(this.quad.material.getUniform('inverseViewProjectionMatrix'), false, camera.getInverseViewProjectionMatrix());
       gl.uniform1i(this.quad.material.getUniform('DEBUG'), this.debug_view);
       gl.uniform1f(this.quad.material.getUniform('exposure'), this.exposure);
-      ref = scene.directionalLights;
-      for (l = 0, len = ref.length; l < len; l++) {
-        light = ref[l];
-        gl.uniform3fv(this.quad.material.getUniform('lightDirection'), light.position);
-        gl.uniform3fv(this.quad.material.getUniform('lightColor'), light.color);
-        gl.uniform1f(this.quad.material.getUniform('lightStrength'), light.strength);
-        gl.uniform1f(this.quad.material.getUniform('lightAttenuation'), light.attenuation);
+      if (this.debug_view === 0) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        ref = scene.directionalLights;
+        for (l = 0, len = ref.length; l < len; l++) {
+          light = ref[l];
+          gl.uniform3fv(this.quad.material.getUniform('lightDirection'), light.position);
+          gl.uniform3fv(this.quad.material.getUniform('lightColor'), light.color);
+          gl.uniform1f(this.quad.material.getUniform('lightStrength'), light.strength);
+          gl.uniform1f(this.quad.material.getUniform('lightAttenuation'), light.attenuation);
+          gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
+        }
+      } else {
+        gl.disable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ZERO);
         gl.drawArrays(gl.TRIANGLES, 0, this.quad.vertexBuffer.numItems);
       }
       this.quad.release();
